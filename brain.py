@@ -19,7 +19,6 @@ import torch.nn.functional as F
 import global_variables as gl
 import exceptions
 import room_generator as rg
-import layers
 
 import random
 import bisect

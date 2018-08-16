@@ -51,7 +51,7 @@ if __name__ == "__main__":
     # Create the map
     room_start = rg.rand_room(500, [0.03,0,0.05,0.01])
     # Create brain to train
-    monkey_brain = brain.BrainDecisionAI(gamma, 4, -1, -50, save_Q=True)
+    monkey_brain = brain.BrainV3()#BrainDecisionAI(gamma, 4, -1, -50, save_Q=True)
     # Put brain in monkey in grid
     monkeys = [monkey.Monkey(monkey_brain)]
     monkeys[0].pos = (len(room_start[1])//2,len(room_start[2])//2)
@@ -59,13 +59,13 @@ if __name__ == "__main__":
     g_CR = grid.Grid(monkeys, room_start)
 
     # Make data paths for the monkey training data
-    paths = ['data\\life'+str(i)+'.txt' for i in range(10)]
+    paths = ['data\\life'+str(i)+'.dat' for i in range(99)]
 
     # for i in range(4000):
     #     g.tick(0, loud=[0], wait=True)
 
-    # # Generate training data
-    # train.monkey_training_data_1_life(20000, 250, 'data\\life', g, loud = [])
+    # Generate training data
+    train.monkey_training_data_1_life(100000, 250, 'data\\life', g, loud = [])
     
 
     # rg.play_record('AIQ\\AIQ.txt')
@@ -84,34 +84,34 @@ if __name__ == "__main__":
     #     monkey_brain, lr_supervised)
 
     # Train the monkey
-    loss_report = train.supervised_training(8, 5, paths, monkey_brain, \
+    loss_report = train.supervised_training(100, 10, paths, monkey_brain, \
         gamma, max_discount, lr_supervised, 10, \
         intermediate='brainsave\\intermediate.brainsave')
 
-    # # Save the brain
-    # torch.save(monkey_brain.state_dict(), 'B10T1.brainsave')
+    # Save the brain
+    torch.save(monkey_brain.state_dict(), 'brainsave\\B11T0.brainsave')
 
-    # out_f = open('out.txt', 'a')
-    # out_f.write(str(loss_report))
-    # out_f.write('\n')
-    # out_f.close()
-    # plt.title('Supervised Training lr' + str(lr_supervised) + \
-    #     ' ' + str(paths))
-    # plt.xlabel('Batch number (3 epochs of 6 batches)')
-    # plt.ylabel('Average Loss per Data Point')
-    # plt.plot(*zip(*loss_report))
-    # plt.show()
+    out_f = open('out.txt', 'a')
+    out_f.write(str(loss_report))
+    out_f.write('\n')
+    out_f.close()
+    plt.title('Supervised Training lr' + str(lr_supervised) + \
+        ' ' + str(paths)[:12])
+    plt.xlabel('Batch number (3 epochs of 6 batches)')
+    plt.ylabel('Average Loss per Data Point')
+    plt.plot(*zip(*loss_report))
+    plt.show()
 
-    # Load brain from permanent memory
-    monkey_brain.load_state_dict(torch.load('B10T2.brainsave'))
+    # # Load brain from permanent memory
+    # monkey_brain.load_state_dict(torch.load('B10T2.brainsave'))
 
-    # Model testing
-    test_results = []
-    for r in range(5):
-        g.monkeys[0].brain.pi = g.monkeys[0].brain.pi_greedy
-        test_results.append(train.test_model(g, 1000, 30))        
-        g.monkeys[0].brain.pi = g.monkeys[0].brain.pi_epsilon_greedy
-        print(test_results)
+    # # Model testing
+    # test_results = []
+    # for r in range(5):
+    #     g.monkeys[0].brain.pi = g.monkeys[0].brain.pi_greedy
+    #     test_results.append(train.test_model(g, 1000, 30))        
+    #     g.monkeys[0].brain.pi = g.monkeys[0].brain.pi_epsilon_greedy
+    #     print(test_results)
     exit()
 
     # Watch monkey train

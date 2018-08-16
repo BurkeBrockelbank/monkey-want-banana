@@ -527,7 +527,7 @@ def supervised_training(epochs, batches, paths, brain, gamma, \
 
     # Now we do the actual learning!
     # Define the loss function
-    criterion = custom_loss.L1ClampLoss(size_average=False)
+    criterion = custom_loss.L1ClampLoss
     # Create an optimizer
     optimizer = torch.optim.Adagrad(brain.parameters(), lr=lr)
     loss_record = []
@@ -545,11 +545,10 @@ def supervised_training(epochs, batches, paths, brain, gamma, \
         # Iterate through data
         for batch_no, batch_set in enumerate(batched_data):
             total_loss = 0
-            print('Epoch', epoch, 'Batch', batch_no, 'begun')
             for real_Q, food, action, vision in batch_set:
                 s = (food, vision)
                 # Get the qualities the monkey deducts.
-                predicted_Q = brain.forward()
+                predicted_Q = brain.forward(s)
                 # Calculate the loss
                 loss = criterion(predicted_Q, real_Q, action)
                 # if loss > 1000:

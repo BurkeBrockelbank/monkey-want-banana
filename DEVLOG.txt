@@ -336,3 +336,5 @@ Monkey test (#3%, m0%, b5%, d1)
   B10T0 | 31.895, 33.088, 33.407, 32.456, 31.387
   B10T1 | 33.198, 33.267, 34.292, 33.666, 32.863
   B10T2 | 27.995, 27.075, 26.281, 25.824, 26.330
+
+I have rewritten the trainer to separate different lives of the monkey into different files. I have also changed the loss function to the L1 Clamp loss and am doing supervised learning with generated quality values again.
