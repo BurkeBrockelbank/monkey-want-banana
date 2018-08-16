@@ -51,21 +51,21 @@ if __name__ == "__main__":
     # Create the map
     room_start = rg.rand_room(500, [0.03,0,0.05,0.01])
     # Create brain to train
-    monkey_brain = brain.BrainV3()#BrainDecisionAI(gamma, 4, -1, -50, save_Q=True)
+    monkey_brain = brain.BrainDecisionAI(gamma, 4, -1, -50, save_Q=True)
     # Put brain in monkey in grid
     monkeys = [monkey.Monkey(monkey_brain)]
     monkeys[0].pos = (len(room_start[1])//2,len(room_start[2])//2)
     g = grid.Grid(monkeys, room_start)
     g_CR = grid.Grid(monkeys, room_start)
 
-    # Make data paths for the monkeys
-    paths = ['AIQ\\AIQ.txt']
+    # # Make data paths for the monkeys
+    # paths = ['AIQ\\AIQ.txt']
 
     # for i in range(4000):
     #     g.tick(0, loud=[0], wait=True)
 
-    # # Generate training data
-    # train.Q_training_data(200000, paths, g)
+    # Generate training data
+    train.monkey_training_data_1_life(20000, 250, 'data\\life', g, loud = [])
     
 
     # rg.play_record('AIQ\\AIQ.txt')

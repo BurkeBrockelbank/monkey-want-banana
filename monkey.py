@@ -23,7 +23,8 @@ class Monkey:
         Args:
             brain: A brain object.
         """
-        self.food = 20
+        self.start_food = 20
+        self.food = self.start_food
         self.dead = False
         self.pos = (0,0)
         self.food_per_banana = 5

@@ -20,6 +20,70 @@ import room_generator as rg
 import math
 import random
 
+def monkey_training_data_1_life(N, life_span, path_root, g, loud = []):
+    """
+    This generates black-box style training data, but every life of the monkey
+    is in only one data file. This makes it possible to generate better
+    qualities. Single monkey tracked for data.
+
+    Args:
+        N: The number of turns that are allowed to take place in total.
+        life_span: The number of turns allowable in a single life.
+        path_root: The path to use for the saves. Integers are appended to
+            the end for multiple files.
+        g: The grid to generate training data from.
+        loud: Default []. List of monkey indeces to watch.
+    """
+    life = 0
+    life_turns = 0
+    for total_turns in range(N):
+        life_turns += 1
+        if total_turns%100 == 0:
+            print('Turn', total_turns, 'life', life)
+        # Tick the monkeys
+        foods, actions, surroundings = g.tick(0, invincible = True, \
+            loud = loud)
+        # Only record the first monkey
+        food = foods[0]
+        action = actions[0]
+        surr = surroundings[0]
+        outF = open(path_root+str(life)+'.dat', 'a')
+        outF.write('(')
+        outF.write(str(food))
+        outF.write(',')
+        outF.write(str(action.item()))
+        outF.write(',')
+        surr_string = str(surr)
+        surr_string = surr_string.replace('tensor','torch.tensor')
+        surr_string = surr_string.replace(' ','')
+        surr_string = surr_string.replace('\n','')
+        outF.write(surr_string)
+        outF.write(')')
+        outF.write('\n')
+        outF.close()
+
+        # Check for changing the file
+        monkey = g.monkeys[0]
+        if monkey.dead or life_turns == life_span:
+            life += 1
+            life_turns = 0
+            monkey.dead = False
+            monkey.food = monkey.start_food
+
+            invalid_spot = True
+            while invalid_spot:
+                i = random.randrange(g.width)
+                j = random.randrange(g.height)
+                # This spot can have a monkey placed on it
+                if g.channel_map[gl.INDEX_BARRIER,i,j] == 0 and \
+                    g.channel_map[gl.INDEX_DANGER,i,j] == 0:
+                    # First teleport the monkey on the channel map
+                    g.teleport_monkey(monkey.pos, (i,j))
+                    # Update the position in the monkey object
+                    monkey.pos = (i,j)
+                    # Flag for completion.
+                    invalid_spot = False
+
 
 def Q_training_data(N, paths, g, loud=[]):
     """
