@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 import global_variables as gl
 import exceptions
 import room_generator as rg
+import custom_loss
 
 import math
 import random
@@ -526,7 +527,7 @@ def supervised_training(epochs, batches, paths, brain, gamma, \
 
     # Now we do the actual learning!
     # Define the loss function
-    criterion = nn.SmoothL1Loss(size_average=False)
+    criterion = custom_loss.L1ClampLoss(size_average=False)
     # Create an optimizer
     optimizer = torch.optim.Adagrad(brain.parameters(), lr=lr)
     loss_record = []
@@ -547,21 +548,21 @@ def supervised_training(epochs, batches, paths, brain, gamma, \
             print('Epoch', epoch, 'Batch', batch_no, 'begun')
             for real_Q, food, action, vision in batch_set:
                 s = (food, vision)
-                # Get the quality of the action the monkey did
-                predicted_Q = brain.Q(s,action)
+                # Get the qualities the monkey deducts.
+                predicted_Q = brain.forward()
                 # Calculate the loss
-                loss = criterion(predicted_Q, real_Q)
-                if loss > 1000:
-                    # There is some issue with the network occasionally spitting
-                    # out huge values. We will cap the maximum value. This is
-                    # done by recalculating the loss with something designed to
-                    # just be just 1000 away from the prediction. To get this
-                    # value, we need to pull the value from predicted_Q and
-                    # remove its needs_gradient property. This is done by casting
-                    # to a floating point number.
-                    raise RuntimeWarning('Loss has been calculated as ridiculous.')
-                    loss = criterion(predicted_Q, \
-                        torch.FloatTensor(float(predicted_Q)-1000))
+                loss = criterion(predicted_Q, real_Q, action)
+                # if loss > 1000:
+                #     # There is some issue with the network occasionally spitting
+                #     # out huge values. We will cap the maximum value. This is
+                #     # done by recalculating the loss with something designed to
+                #     # just be just 1000 away from the prediction. To get this
+                #     # value, we need to pull the value from predicted_Q and
+                #     # remove its needs_gradient property. This is done by casting
+                #     # to a floating point number.
+                #     raise RuntimeWarning('Loss has been calculated as ridiculous.')
+                #     loss = criterion(predicted_Q, \
+                #         torch.FloatTensor(float(predicted_Q)-1000))
                 # Zero the gradients
                 optimizer.zero_grad()
                 # perform a backward pass

@@ -58,14 +58,14 @@ if __name__ == "__main__":
     g = grid.Grid(monkeys, room_start)
     g_CR = grid.Grid(monkeys, room_start)
 
-    # # Make data paths for the monkeys
-    # paths = ['AIQ\\AIQ.txt']
+    # Make data paths for the monkey training data
+    paths = ['data\\life'+str(i)+'.txt' for i in range(10)]
 
     # for i in range(4000):
     #     g.tick(0, loud=[0], wait=True)
 
-    # Generate training data
-    train.monkey_training_data_1_life(20000, 250, 'data\\life', g, loud = [])
+    # # Generate training data
+    # train.monkey_training_data_1_life(20000, 250, 'data\\life', g, loud = [])
     
 
     # rg.play_record('AIQ\\AIQ.txt')
@@ -83,9 +83,10 @@ if __name__ == "__main__":
     # loss_report = train.cross_entropy_supervised_training(8, 6, paths, \
     #     monkey_brain, lr_supervised)
 
-    # # Train the monkey
-    # loss_report = train.supervised_training(8, 6, paths, monkey_brain, \
-    #     gamma, max_discount, lr_supervised, 10, intermediate='brain_intermediate')
+    # Train the monkey
+    loss_report = train.supervised_training(8, 5, paths, monkey_brain, \
+        gamma, max_discount, lr_supervised, 10, \
+        intermediate='brainsave\\intermediate.brainsave')
 
     # # Save the brain
     # torch.save(monkey_brain.state_dict(), 'B10T1.brainsave')
