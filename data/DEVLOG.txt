@@ -1,0 +1,338 @@
+TESTING LINEAR MODEL AGAINST AI
+An AI was developed to navigate the monkey game. This AI was then used to generate over 1.3 million turns of gameplay. A linear model was trained with this data. Reinforcement learning was attempted after this, but no increase in the accuracy of the quality function was found so this training was reverted.
+
+The models were scored against eachother based on the amount of food they could collect in 30 turns averaged over 1000 random placements. This was repeated five times each.
+
+ Model | Score
+-------+-------
+Linear |  6.45, 6.923, 6.739, 7.158, 6.906
+    AI | 39.341, 38.701, 39.334, 40.7, 39.474
+
+It is clear that the linear model for the monkey brain is insufficiently complex for modelling the artificial intelligence.
+
+PROGRESSION TO A FULL CNN
+I added a convolutional layer to the progressional brain. The net architecture is
+(4x11x11) & 1
+(4x11x11) & 1 Conv2d ReLU
+485 Flatten
+9 Relu
+8 Relu
+5
+
+It behaves quite well after training on AIDATA\AIData0.txt for 30 epochs in 3 batches each with randomized order between each epoch. This is in contrast to more rudimentary nets. Clearly the convolutional layer makes the network more capable of learning the AI algorithm.
+
+Built gif of performance in ./img/OneConvLayer showing this. The qualities are clearly wrong, but at least the net is making the right decisions. After reinforcement elarning the qualities improve drastically. I will add in more layers.
+
+Added yet another fully-connected layer
+(4x11x11) & 1
+(4x11x11) Conv2d ReLU & 1
+484 Flatten & 1
+25 ReLU & 1
+26
+9 Relu
+8 Relu
+5
+
+This seems to be important. The supervised training is going a lot better with this layer
+added in! The loss is looking to stagnate around 0.45 whereas without this layer it was getting stuck around 0.7.
+
+The result of supervised training actually wasn't too good because the AI often gets stuck, the monkey often just got stuck itself.
+
+This bad result carried over to the curated training. I will try again with fewer epochs.
+
+Did 10 epochs and the loss stopped at 0.67 like the previous successful test. It still didn't work too well. The performance is much better. Adding in the rest of the convolutional layers.
+
+(4x11x11) & 1
+(4x11x11) Conv2d ReLU & 1
+(6x9x9) Conv2d ReLU & 1
+(4x7x7) Conv2d ReLU & 1
+(1x5x5) Conv2d ReLU & 1
+25 Flatten & 1
+26 Concat
+9 Relu
+8 Relu
+5
+
+Supervised training started with higher than expected loss (2.95). Each epoch is now taking less time, but the training rate has decreased and stagnated at a loss of 1.2. Monkey behavior seems fairly random. The monkey is not making intelligent choices. This is not a surprise because the amount of training data was not increased. We will add in another two data files.
+
+Using AIDATA\AIData0.txt, AIDATA\AIData1.txt, AIDATA\AIData2.txt for training. Supervised training seemed totally ineffective. The monkey just sits still. Not staying still anymore. I am going to increase the exploration rate to a constant 0.8 and go for another round of curated reinforcement learning.
+
+The net seems to be insensitive to training.
+
+BRAIN V3: SMALL SCALE UNLEARNABILITY
+One of the reasons that the net was unable to learn was that it had too many convolutional layers, leading to a receptive field that is far larger than what we want. The monkey needs to be able to see its near surroundings exactly. As such, a separate branch will be created for this.
+
+Convolutions are specified as (kernel size, padding, stride)
+
+vision                  & vision                        & food
+(4x11x11)               & (4x11x11)                     & 1
+(4x5x5) Crop            & (8x11x11) Conv2d(3,1,1) ReLU  & 1
+(4x5x5)                 & (4x8x8) Conv2d(4,0,1) ReLU    & 1
+(4x5x5)                 & (2x5x5) Conv2d(4,0,1) ReLU    & 1
+(4x5x5)                 & (2x5x5)                       & 1
+150 Flatten             & 1
+151 Concat
+25 Relu
+9 Relu
+8 Relu
+5
+
+
+Supervised training on AIData0.txt lr0.001 epoch10 batch3 OptimizerAdam
+Curated Reinforcement training level0 lr0.001 gamma0.8 food20 epsilon(0.9,0.1,1000) N4000 OptimizerAdagrad
+This architecture seems to be onto something. After supervised training, there was clearly some sort of benefit, although the qualities were inaccurate. When this was turned over to CR learning, the results initially seem phenomenal See V3.png. The monkey is also consistently moving towards bananas.
+
+Trying now this training method:
+Supervised training on AIData0.txt lr0.001 epoch10 batch3 max_discount0.05 OptimizerAdam
+CR training level0 lr0.001 gamma0.8 food20 epsilon(0.7,0.1,2000) N4000 OptimizerAdam
+CR training level1 lr0.001 gamma0.8 food20 epsilon(0.3,0.1,2000) N4000 OptimizerAdam
+CR training level0 lr0.001 gamma0.8 food20 epsilon(0.3,0.1,2000) N4000 OptimizerAdam
+CR training level1 lr0.001 gamma0.8 food20 epsilon(0.3,0.1,2000) N4000 OptimizerAdam
+CR training level2 lr0.001 gamma0.8 food20 epsilon(0.3,0.1,2000) N4000 OptimizerAdam
+CR training level1 lr0.001 gamma0.8 food20 epsilon(0.3,0.1,2000) N4000 OptimizerAdam
+
+Overall I am fairly happy with this. I will try now to set it free in the banana room (6% bananas)
+T6: DQN lr0.01 gamma0.8 epsilon(0.3,0.1,5000) N50000 OptAdam
+T7: CR level1 lr0.001 gamma0.8 food20 epsilon(0.15,0.15,1) N2000 OptAdam
+T8: DQN lr0.001 gamma0.8 epsilon(0.3,0.1,5000) N50000 OptAdam
+
+I notice that the monkey moves preferentially to the left. While this is garnering it a decent amount of food, this is not how a human would play, and it is not the most efficient method for moving around. My solution is to do curated training a further distance out so it will learn that it is beneficial to go up and down and not ignore up and down in favour of going left.
+T9: CR level3 lr0.001 gamma0.8 food20 epsilon(0.15,0.15,1) N2000 OptAdam
+
+Testing monkeys in random room (6% bananas)
+ Model | Score
+-------+-------
+T9Model|  9.816, 9.828, 9.594, 9.990, 9.680
+    AI | 39.407, 38.685, 39.991, 39.789, 39.555
+
+Clearly the model is still insufficiently replicating the AI, however we are seeing an improvement over the linear AI. One of the issues we have is that the monkey is still missing things that are more than a few blocks away in the examples up to now. I think that this is primarily because outside of two blocks away, the monkey doesn't see exactly what is going on around it. This cropping occurs in the brain architecture. I think it is time to allow it to train in the banana room with some more complexity. I will go with a room that includes lava and barriers now. (2% barriers, 6% bananas, 1% lava). However, first I want to check it with curation of level 2 again briefly.
+
+
+I had a great idea! I made it so that the initial move in curated training is always random. This way it explores in the first move (where it knows nothing) and then rely on its past curation training. I am starting a new training branch, called branch 1. Filenames for brain saves will be of the form B1Tnn.brainsave.
+
+B1T0: CR lvl0 lr0.001 gamma0.8 food20 eps(0.3,0.1,2000) N10000 OptAdam
+The monkey is not too accurate. I am not really sure why.
+B1T1: CR lvl1 lr0.0005 gamma0.8 food20 eps(0.3,0.1,2000) N10000 OptAdam
+I did some experimenting and it is a learning rate problem! The level 1 training does so much better with a smaller learning rate.
+
+B1T0: CR lvl0 lr0.001 gamma0.8 food20 eps(0.3,0.1,2000) N10000 OptAdam rand_start
+B1T1: CR lvl0 lr0.001 gamma0.8 food20 eps(0.3,0.1,2000) N3000 OptAdam
+B1T2: CR lvl1 lr0.001 gamma0.8 food20 eps(0.3,0.1,2000) N5000 OptAdam
+
+It's not doing too well honestly. I am going to let it do supervised training again. Keeping gamma at 0.8.
+
+B2T0: Supervised AIData0.txt AIData1.txt AIData2.txt lr0.01 epoch10 batch3 max_discount0.05 OptAdagrad
+
+From watching the monkey train, it is clear that the qualities are highly overestimated. This is to be expected because of the sheer number of bananas the AI monkey collects. The monkey seems to make the correct decision for movement some of the time.
+
+B2T1: CR lvl0 lr0.001 gamma0.8 food20 eps(0.3,0.1,2000) N5000 OptAdam
+
+The monkey is making all the right decisions at the 0th level of curation. Clearly pretraining with the AI is extremely important.
+
+B2T2: CR lvl1 lr0.001 gamma0.8 food20 eps(0.3,0.1,2000) N5000 OptAdam
+
+I noticed that before training the monkey was actually making decent decisions. I suppose that this must be due to B2T0 training. After training I don't see any marked improvement honestly. I notice that oftentimes the monkey doesn't know what to do when it gets adjacent to a banana as well. I will just train more and overwrite this last training.
+
+B2T2: CR lvl1 lr0.001 gamma0.8 food20 eps(0.3,0.1,2000) N15000 OptAdam
+
+It really didn't help.
+
+B2T2: CR lvl1 lr0.001 gamma0.8 food20 eps(0.3,0.1,2000) N5000 OptAdam
+
+Performance is quite good.
+
+B2T3: CR lvl0 lr0.001 gamma0.8 food20 eps(0.3,0.1,2000) N5000 OptAdam
+
+The model is a little too optimistic still about the rewards. I am going to let it run for a while in the random room to change that.
+
+B2T4: RR lr0.001 gamma0.8 food20 eps(0.5,0.1,5000) N15000 OptAdam
+
+Already before training I am testing the monkey on 2nd level curationn and it doesn't look bad. After training, the monkey retains its good curated training behavior
+
+Monkey test
+
+Testing monkeys in random room (2% barriers, 6% bananas, 1% lava)
+ Model | Score
+-------+-------
+  B2T4 | 20.487, 21.365, 21.366, 21.068, 20.536
+    AI | 31.863, 29.772, 29.655, 30.651, 30.145
+
+This is indeed exciting! As we would expect, the AI does worse when we begin adding barriers (which must be traversed around) and lava. The B2T4 model also, on average, ends its turn with more food than it initally had! this means that, on average, it is self sustaining. Due to fluctuations of course it will still die most likely, but we are getting close to a fully self-sustaining monkey.
+
+With this in mind I will do some level 0 training on lava. Followed by some level 2 training on bananas.
+
+B2T5: CR lvl0 lr0.001 gamma0.8 food20 eps(0.3,0.1,5000) N5000 OptAdam LAVA
+
+Now let's do some level 2 training with bananas.
+
+B2T6: CR lvl2 lr0.001 gamma0.8 food20 eps(0.3,0.1,2000) N10000 OptAdam
+
+The level 2 training didn't go well. The monkey lost its ability to make smart decision. We will revert back to B2T4.
+
+B2T5: RR lr0.001 gamma0.8 food20 eps(0.5,0.05,5000) N50000 OptAdam
+
+Let's test it again.
+
+ Model | Score
+-------+-------
+  B2T4 | 31.411, 32.226, 31.097, 31.857, 31.087
+    AI | 31.863, 29.772, 29.655, 30.651, 30.145
+
+The monkey is about the same as the AI even a little better!!! I will make a gif of it playing (B2T5.gif).
+
+What I would like to do at some point to make it play more like a human is to add some recurrency. However, right now I will just allow it to play for a while to get better. I am also going to reduce the banana frequency to 5%.
+
+B2T6: RR lr0.001 gamma0.8 food20 eps(0.2,0.05,5000) N50000 OptAdam
+
+ Model | Score
+-------+-------
+  B2T4 | 19.117, 19.650, 19.352, 19.283, 19.721
+    AI | 26.500, 25.778, 24.676, 25.086, 23.639
+
+The AI is outperforming again with sparser bananas. I will increase the barrier frequency to 3% and see what happens (#3%, m0%, b5%, d1%).
+
+ Model | Score
+-------+-------
+  B2T4 | 18.901, 17.631, 19.069, 18.12, 17.987
+
+B2T7: RR lr0.001 gamma0.8 food20 eps(0.1,0.05,5000) N50000 OptAdam
+
+ Model | Score
+-------+-------
+  B2T4 | 26.505, 26.434, 35.357, 24.948, 24.583
+    AI | 23.989, 21.699, 22.245, 20.497, 19.907
+
+Watching this monkey go, I wonder if that the entire convolutional branch is pointless. The monkey doesn't seem to be using it at all. In fact, it completely ignores bananas that are far away. Anyway, the monkey is doing better than the AI now that we have added more barriers! That's a good place to stop today.
+
+B2T8: CR lvl3 lr0.001 gamma0.8 food20 eps(0.3,0.1,2000) N10000 OptAdam
+
+My goal is to have a more streamlined approach based on the previous approach.
+
+B3T0: Supervised AIData0.txt-AIData4.txt lr0.01 epoch10 batch6 max_discount0.05 OptAdagrad
+
+ Model | Score
+-------+-------
+  B3T0 | 4.171, 3.859, 4.156, 4.146, 3.966
+
+B3T1: CR lvl0 lr0.001 gamma0.8 food20 eps(0.4,0.2,2000) N10000 OptAdam
+B3T2: CR lvl1 lr0.001 gamma0.8 food20 eps(0.3,0.1,2000) N5000 OptAdam
+B3T3: CR lvl2 lr0.001 gamma0.8 food20 eps(0.3,0.1,2000) N5000 OptAdam
+B3T4: CR lvl0 lr0.001 gamma0.8 food20 eps(0.3,0.1,2000) N5000 OptAdam blocktype 'd'
+
+Monkey test (#3%, m0%, b5%, d1%)
+
+B3T5: RR lr0.001 gamma0.8 food20 eps(0.5,0.05,25000) N150000 OptAdam (#3%, m0%, b5%, d1)
+
+Monkey test (#3%, m0%, b5%, d1%)
+
+Nothing is working again. I really think it is because of the dirtiness of the data. I tried again with B2T0 and it works. I will try to replicate the results of B2T0.
+
+B4T0: Supervised AIData0.txt AIData1.txt AIData2.txt lr0.01 epoch10 batch3 max_discount0.05 OptAdagrad
+B4T1: CR lvl0 lr0.001 gamma0.8 food20 eps(0.3,0.1,2000) N5000 OptAdam
+B4T2: CR lvl1 lr0.001 gamma0.8 food20 eps(0.3,0.1,2000) N5000 OptAdam
+
+I haven't quite finished the above. Right now I am cleaning the data files of infinite loops. It seems that the vast majority of infinite loops are of length two (i.e. two states that feed into one another). Almost none are of length 1 and less than a percent seem to be of length 4. Length 3 is of course impossible.
+
+Now I will repeat training B3 on the cleaned data to see what happened.
+
+B5T0: Supervised AIData0CLEAN.txt lr0.01 epoch8 batch6 max_discount0.05 OptAdagrad
+
+It doesn't work. Trying a new training method, overwriting B5. In the new method we just do supervised training with the cross entropy loss between the model's Q values and the action taken by the AI. It ended up working VERY well in getting the monkey to move in the right direction, but, as would be expected, the quality values don't actually mean anything. This will be recalibrated in some curated training.
+
+B5T1: CR lvl0 lr0.001 gamma0.8 food20 eps(0.3,0.1,2000) N50000 OptAdam
+
+It's looking good! However I do notice that it easily gets stuck in non-curated situations. This will have to be fixed in RR training.
+
+B5T2: CR lvl1 lr0.001 gamma0.8 food20 eps(0.3,0.1,2000) N50000 OptAdam
+
+That ruined it!
+
+B5T2: CR lvl1 lr0.001 gamma0.8 food20 eps(0.3,0.1,2000) N5000 OptAdam
+
+The monkey is performing slightly worse, but the qualities are more correct. I think this is good enough.
+
+B5T3: CR lvl0 lr0.001 gamma0.8 food20 eps(0.3,0.1,2000) N2000 OptAdam block'd'
+
+B5T4: RR lr0.001 gamma0.8 food20 eps(0.5,0.05,10000) N50000 OptAdam (#3%, m0%, b5%, d1)
+
+Before training the monkey just always ends up standing still. Afterwards it moves down and finds nothing.
+
+B5T0: Supervised AIData0CLEAN.txt-AIData5CLEAN.txt lr0.01 epoch8 batch6 max_discount0.05 OptAdagrad
+
+Monkey test (#3%, m0%, b5%, d1%)
+ Model | Score
+-------+-------
+  B5T0 | 30.307, 29.549, 30.068, 27.797, 29.180
+    AI | 22.904, 22.500, 21.671, 19.885, 20.235
+
+Already we see that the model does better than the AI. This is likely due to using cleaned data and the architecture of the neural net itself. Let's do some CR to fix the qualities.
+
+B5T1: CR lvl0 lr0.001 gamma0.8 food20 eps(0.2,0.1,2000) N2000 OptAdam
+B5T2: CR lvl1 lr0.001 gamma0.8 food20 eps(0.2,0.1,2000) N2000 OptAdam
+B5T3: CR lvl2 lr0.001 gamma0.8 food20 eps(0.2,0.1,2000) N2000 OptAdam
+
+The curated training may have ruined it! Let's try some RR to see if it is redeemable.
+
+Monkey test (#3%, m0%, b5%, d1)
+ Model | Score
+-------+-------
+  B5T2 | 12.441, 11.924, 12.278, 11.732, 12.176
+  B5T3 | 4.361, 4.400, 4.287, 4.407, 4.311
+  B5T4 | 2.709, 4.319, 4.203, 4.030, 4.147
+  B6T1 | 20.476, 20.566, 20.636, 19.834, 20.660
+  B6T0 | 29.783, 29.646, 28.895, 28.349, 28.757
+  B6T2 | 26.02, 26.305, 24.994, 23.664, 24.105
+
+B5T4: RR lr0.001 gamma0.8 food20 eps(0.2,0.05,10000) N50000 OptAdam (#3%, m0%, b5%, d1%)
+
+It ended up being pretty stupid. I will work off of B5T0 again.
+
+B6T0: B5T0
+B6T1: RR lr0.001 gamma0.8 food20 eps(0.2,0.05,10000) N50000 OptAdam (#3%, m0%, b5%, d1%)
+
+I believe the issue is that after B6T0 the performance is good because it trained against the AI but the qualities are all off. Then when we do reinforcement training, it throws those quality values more towards the correct values while destroying the accurate decision making structure. If we were to to SL followed by some RR, followed by SL again, it should work. SL will get the network in the right neighborhood for accurate decision making, RR will bring the qualities into range, and then SL should make the qualities similar to before. So if we do SL on B6T1, it will bring back the ddecision making, but the qualities will be more accurate. Then, we can do more RR to refine the AI.
+
+B6T2: Supervised AIData0CLEAN.txt-AIData5CLEAN.txt lr0.01 epoch8 batch6 max_discount0.05 OptAdagrad
+
+The qualities are way off again. I think I need to start with an AI that has qualities.
+
+August 13, 2018
+I finished writing the new AI that actually forms qualities. It is important to note that a more sophisticated AI could have been made, but the idea is that we can write something that is cobbled together and then have the monkey improve on it.
+
+
+B7T0: Supervised AIQ.txt lr0.01 epoch3 batch6 OptAdagrad
+B8T0: Supervised AIQ.txt lr0.005 epoch3 batch6 OptAdagrad
+B8T0>B8T1: Supervised AIQ.txt lr0.001 epoch3 batch6 OptAdam
+B9T0: Supervised AIQ.txt lr0.001 epoch3 batch6 OptAdam
+B9T0: [(0, 1.159963676864431), (1, 0.3839519015815233), (2, 0.29398681060825244), (3, 0.246283497371789), (4, 0.2204386922023366), (5, 0.19181332473944612), (6, 0.166659355408144), (7, 0.15539608954418122), (8, 0.13654959302565997), (9, 0.12556600833205775), (10, 0.12001139864236249), (11, 0.11707362813501568), (12, 0.11153982498517423), (13, 0.10300092091143297), (14, 0.09810542092239706), (15, 0.09794530025311864), (16, 0.09712693241050831), (17, 0.0933433638854252)]
+B9T0>B9T1: Supervised AIQ.txt lr0.0001 epoch3 batch6 OptAdam
+B9T1: [(0, 0.08936239111418097), (1, 0.08508474309864933), (2, 0.08428258632290019), (3, 0.08348967887766519), (4, 0.08018727436117791), (5, 0.07764080053934375), (6, 0.07677416288165016), (7, 0.07698520274974957), (8, 0.0735351885543029), (9, 0.07116811417289577), (10, 0.07203058709159088), (11, 0.07043971272836361)]
+
+Monkey test (#3%, m0%, b5%, d1)
+ Model | Score
+-------+-------
+  B7T0 | 5.227, 5.088, 4.835, 4.966, 4.85
+  B7T1 | 42.456, 43.44, 44.861, 43.191, 44.592
+  B8T0 | 4.42
+  B9T0 | 32.677, 32.653, 33.766, 32.004, 31.737
+  B9T1 | 34.805, 34.914, 35.647, 36.014, 34.986
+
+
+B9T2: RR lr0.001 gamma0.8 food20 eps(0.1,0.05,10000) N50000 OptAdam (#3%, m0%, b5%, d1%)
+
+I realized I made an error in the AI where it wasn't correctly checking for barriers and danger around itself. I have to regenerate all the data.
+
+B10T0: Supervised AIQ.txt lr0.001 epoch3 batch6 OptAdam
+B10T0: [(0, 0.7118058174188239), (1, 0.5368936589102467), (2, 0.47634852371743325), (3, 0.4590919623883152), (4, 0.4242624473747127), (5, 0.41937614541992385), (6, 0.4316460456945558), (7, 0.414451541598901), (8, 0.40463973179179163), (9, 0.3979706317295995), (10, 0.35652733518625046), (11, 0.34628579537563636), (12, 0.34644300185361), (13, 0.3116296750875759), (14, 0.2917572970034352), (15, 0.2832087464096649), (16, 0.283203327573345), (17, 0.2652162148261154)]
+
+B10T0>B10T1: Supervised AIQ.txt lr0.0001 epoch2 batch6 OptAdam
+B10T1:[(0, 0.2496050657726996), (1, 0.23334774751405069), (2, 0.23704588304919352), (3, 0.21369923493337065), (4, 0.1954035487456129), (5, 0.18427802857059938), (6, 0.18273047322075123), (7, 0.18167273716043497), (8, 0.170218082672279), (9, 0.18139756227718185), (10, 0.17215481813844713), (11, 0.17249561768723576)]
+
+B10T1>B10T2: RR lr0.001 gamma0.8 food20 eps(0.1,0.05,10000) N50000 OptAdam (#3%, m0%, b5%, d1%)
+
+Monkey test (#3%, m0%, b5%, d1)
+  Model | Score
+--------+-------
+  B10T0 | 31.895, 33.088, 33.407, 32.456, 31.387
+  B10T1 | 33.198, 33.267, 34.292, 33.666, 32.863
+  B10T2 | 27.995, 27.075, 26.281, 25.824, 26.330
