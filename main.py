@@ -51,7 +51,7 @@ if __name__ == "__main__":
     # Create the map
     room_start = rg.rand_room(500, [0.03,0,0.05,0.01])
     # Create brain to train
-    monkey_brain = brain.BrainV4()#BrainDecisionAI(gamma, 4, -1, -50, save_Q=True)
+    monkey_brain = brain.BrainV5()#BrainDecisionAI(gamma, 4, -1, -50, save_Q=True)
     # Put brain in monkey in grid
     monkeys = [monkey.Monkey(monkey_brain)]
     monkeys[0].pos = (len(room_start[1])//2,len(room_start[2])//2)
