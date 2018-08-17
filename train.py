@@ -582,6 +582,132 @@ def supervised_training(epochs, batches, paths, brain, gamma, \
 
     return loss_record
 
+def supervised_columns(epochs, batches, paths, brain, gamma, \
+    max_discount, lr, report = True, intermediate = ''):
+    """
+    This performs supervised training on the monkey. 
+    
+    Args:
+        N: The number of epochs to run in training.
+        paths: A list of paths leading to the data files.
+        brain: The brain to train.
+        gamma: The discount factor in the Bellman equation.
+        max_discount: The maximum factor to allow for discount in calculating
+        qualities.
+        lr: The learning rate to use.
+        reports: The number of times to print progress.
+        intermediate: The file to save intermediate brain trainings to.
+
+
+    Returns:
+        0: Training data in the form of list of tuples. First element is epoch
+        number, second number is average loss over this epoch.
+    """
+    # Set the brain to training mode
+    brain.train()
+
+    all_data = []
+
+    # First read all training data
+    all_lines = []
+    for path in paths:
+        print('Reading', path)
+        in_f = open(path, 'r')
+        in_lines = in_f.readlines()
+        in_f.close()
+        # parse the input lines
+        data = [eval(x.rstrip()) for x in in_lines]
+        all_lines.append(data)
+        # As a reminder, the data structure is
+        # food (int), action (int),board state (torch.tensor dtype=torch.uint8)
+        # Now we need to calculate the quality for each of these
+        food_vals = [x[0] for x in data]
+        # We now will subtract subsequent food values to get the change in food
+        food_diffs = [food_vals[i]-food_vals[i-1] for i in \
+            range(1,len(food_vals))]
+        # Delete the final row of data because it has no food difference
+        # that can be calculated 
+        new_data = data[:-1]
+        # Calculate qualities
+        quals = [0]
+        for food_diff in food_diffs[::-1]:
+            quals.append(quals[-1]*gamma+food_diff)
+        quals = quals[1:]
+        quals = quals[::-1]
+        # Insert the quality into the data
+        new_data = [(torch.tensor(quality),) + state_tuple \
+            for state_tuple, quality in zip(new_data, quals)]
+        # Add to the list of data sets
+        all_data.append(new_data)
+    # Since the final quality values concatenate the series short, we should
+    # cut those data points. We will arbitrarily decide to ignore rewards which
+    # have a reduction in magnitute by the factor max_discount.
+    n_to_cut = math.ceil(math.log(max_discount)/math.log(gamma))
+    all_data = [x[:-n_to_cut] for x in all_data]
+    # And now we have processed the data
+
+    # Concatenate the data sets.
+    data_set = [el for one_path in all_data for el in one_path]
+
+    # Calculate batch data
+    batch_length = len(data_set)//batches
+
+    # Due to symmetry, we can increase the data set eightfold.
+    data_symmetric = []
+    # Still unimplemented
+
+    # Report status
+    print('Data loaded')
+
+    # Now we do the actual learning!
+    # Define the loss function
+    criterion = custom_loss.L1_clamp_loss
+    # Create an optimizer
+    optimizer = torch.optim.Adagrad(brain.parameters(), lr=lr)
+    loss_record = []
+    # Iterate through epochs
+    for epoch in range(epochs):
+        total_loss = 0
+        # Permute the data to decorrelate it.
+        random.shuffle(data_set)
+        # Separate into batches
+        batched_data = []
+        for batch_no in range(batches-1):
+            batch_start = batch_no*batch_length
+            batched_data.append(data_set[batch_start:batch_start+batch_length])
+        batched_data.append(data_set[(batches-1)*batch_length:])
+
+        # Iterate through data
+        for batch_no, batch_set in enumerate(batched_data):
+            column_data = list(zip(*batch_set))
+            real_Q_vec = torch.stack(column_data[0])
+            foods = torch.tensor(column_data[1])
+            actions = torch.tensor(column_data[2])
+            visions = torch.stack(column_data[3])
+            # print(real_Q_vec[:3])
+            # print(foods[:3])
+            # print(actions[:3])
+            # print(visions.size())
+            predicted_Qs = brain.forward(foods, visions)
+            loss = torch.mean(criterion(predicted_Qs, real_Q_vec, actions))
+            # Zero the gradients
+            optimizer.zero_grad()
+            # perform a backward pass
+            loss.backward()
+            # Update the weights
+            optimizer.step()
+            # Add to loss record
+            total_loss += loss.float()
+        if report:
+            loss_record.append((epoch, total_loss/batches))
+            print('Epoch', epoch, 'loss', total_loss/batches)
+
+        # Save brain
+        if intermediate != '':
+            torch.save(brain.state_dict(), intermediate)
+
+    return loss_record
+
 def load_records(path):
     """
     Loads in the records for loss function vs. epochs

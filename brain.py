@@ -24,10 +24,13 @@ import random
 import bisect
 import itertools
 
-class BrainDQN(nn.Module):
+class BrainDQNColumns(nn.Module):
     """
     This is the basic deep-Q brain class that all other brain classes will be
     based on.
+
+    The difference between this and BrainDQN is the input to forward is that
+    the input to forward is a vector of food values and a vector of visions.
 
     This brain has no memory implementation.
 
@@ -57,14 +60,15 @@ class BrainDQN(nn.Module):
         Initialize the architecture of the neural net.
         """
         # Initialize the parent class
-        super(BrainDQN, self).__init__()
+        super(BrainDQNColumns, self).__init__()
 
-    def forward(self, s):
+    def forward(self, foods, visions):
         """
         Returns the 5-tensor of qualities corresponding to each direction.
 
         Args:
-            s: The state of the system.
+            foods: The food states of the system.
+            visions: The vision states of the system.
         
         Returns:
             0: 5-tensor of qualities.
@@ -80,13 +84,17 @@ class BrainDQN(nn.Module):
         Gives the quality and action corresponding to a totally greedy policy.
 
         Args:
-            s: The state of the system.
+            foods: The food states of the system.
+            visions: The vision states of the system.
 
         Returns:
             0: The maximal quality.
             1: The action that maximizes quality.
         """
-        Qs = self.forward(s)
+        food, vision = s
+        foods = torch.tensor(food).view(1,1)
+        visions = vision[None]
+        Qs = self.forward(foods, visions)[0]
         max_Q, max_a = Qs.max(0)
         return max_Q, max_a, 1
 
@@ -114,7 +122,10 @@ class BrainDQN(nn.Module):
         Returns:
             0: The quality of that move.
         """
-        Qs = self.forward(s)
+        food, vision = s
+        foods = torch.tensor(food).view(1,1)
+        visions = vision[None]
+        Qs = self.forward(foods, visions)[0]
         return Qs[a]
 
 
@@ -180,6 +191,151 @@ class BrainDQN(nn.Module):
         Args:
             s: The gamesate.
 
+        Returns:
+            0: The quality of the action.
+            1: The action to be taken.
+        """
+        # Make a random movement
+        a = random.randrange(0,len(gl.WASD))
+        # Calculate the qualities
+        return self.Q(s,a), a
+
+class BrainDQN(nn.Module):
+    """
+    This is the basic deep-Q brain class that all other brain classes will be
+    based on.
+
+    This brain has no memory implementation.
+    The convention will be that every Q, s, a or other expression relating to a
+    single state of phase space will have no dimension for multiples, i.e. they
+    will NOT be in the form tensor([s1, s2, s3, s4, ...]) where sn is the nth
+    state.
+    s is a tuple (food, vision).
+    food is an integer.
+    vision is a 3-tensor. The first index refers to channel, the second to row, and
+    the third to column.
+    a is an integer 1-tensor corresponding to the
+    index of the direction as specified in gl.WASD.
+    Qs is a 1-tensor of length five.
+    Q is a 0-tensor float corresponding to the quality of an action in a
+    given state.
+    """
+
+    def __init__(self):
+        """
+        Initialize the architecture of the neural net.
+        """
+        # Initialize the parent class
+        super(BrainDQN, self).__init__()
+
+    def forward(self, s):
+        """
+        Returns the 5-tensor of qualities corresponding to each direction.
+        Args:
+            s: The state of the system.
+        
+        Returns:
+            0: 5-tensor of qualities.
+        Raises:
+            BrainError: This is only meant to be a parent class. Using this class
+            as if it were functional should raise an error.
+        """
+        raise exceptions.BrainError
+
+    def pi_greedy(self, s):
+        """
+        Gives the quality and action corresponding to a totally greedy policy.
+        Args:
+            s: The state of the system.
+        Returns:
+            0: The maximal quality.
+            1: The action that maximizes quality.
+        """
+        Qs = self.forward(s)
+        max_Q, max_a = Qs.max(0)
+        return max_Q, max_a, 1
+
+    def argmax_a(self, s):
+        """
+        Returns the action that maximizes quality for the state s.
+        
+        Args:
+            s: The state of the system.
+        Returns:
+            0: Action which maximizes the quality of the state.
+        """
+        max_Q, max_a, _ = self.pi_greedy(s)
+        return max_a
+
+    def Q(self, s, a):
+        """
+        Returns the quality of performing action a in state s.
+        Args:
+            s: The state of the system.
+            a: The action.
+        Returns:
+            0: The quality of that move.
+        """
+        Qs = self.forward(s)
+        return Qs[a]
+
+
+    def pi_epsilon_greedy(self, s, epsilon):
+        """
+        Enacts the epsilon-greedy policy of the brain.
+        Args:
+            s: The state of the system.
+            epsilon: The probibility of taking a random movement.
+        Returns:
+            0: The determined quality of this move.
+            1: The action the policy points to.
+        """
+        # Roll a random number
+        if random.uniform(0, 1) < epsilon:
+            # Make a random movement
+            Q, a = self.pi_random(s)
+            # Calculate the qualities
+            return Q, a, epsilon
+        else:
+            # Get the probability of this occuring
+            p = 1-epsilon
+            # Just take the best action
+            Q, a, _ = self.pi_greedy(s)
+            return Q, a, p
+
+    def pi_probabilistic(self, s):
+        """
+        Enacts the policy of qualities corresponding to probabilities.
+        Qualities are fed into a softmax and then an action selected
+        according to those probabilities.
+        Args:
+            s: The gamesate.
+        Returns:
+            0: The quality of the action.
+            1: The action to be taken.
+        """
+        # Find the qualities.
+        Qs = self.forward(s)
+        # Run this through a softmax
+        Q_softmax = F.softmax(Qs, dim=0)
+        # Calculate the CDF.
+        CDF = [Q_softmax[0]]
+        # The CDF is one element shorter than the probabilities because the
+        # last element is one.
+        for p in Q_softmax[1:-1]:
+            CDF.append(CDF[-1]+p)
+        # Generate a random number in a uniform distribution from 0 to 1.
+        roll = random.uniform(0, 1)
+        # Get the action this corresponds to.
+        a = bisect.bisect(CDF, roll)
+        # Return the quality and action.
+        return Qs[a], a, Q_softmax[a]
+
+    def pi_random(self, s):
+        """
+        Enacts the policy of qualities corresponding to random decision.
+        Args:
+            s: The gamesate.
         Returns:
             0: The quality of the action.
             1: The action to be taken.
@@ -623,6 +779,68 @@ class BrainV3(BrainDQN):
         h = F.relu(self.f2(h))
         h = F.relu(self.f3(h))
         Q = self.f4(h)
+
+        if self.report:
+            print(Q)
+
+        return Q
+
+class BrainV4(BrainDQNColumns):
+    """
+    This implements the fourth approach of the monkey brain. This has no
+    convolutional branch.
+
+    This brain has no memory implementation.
+
+    Note: the input to forward now is compatible with a vector of visions
+    and a vector of foods.
+    """
+    def __init__(self):
+        """
+        Initialize the architecture of the neural net.
+        """
+        # Initialize the parent class
+        BrainDQNColumns.__init__(self)
+        # Set the default policy
+        self.pi = self.pi_epsilon_greedy
+
+        # Create fully connected layers
+        # Input is 4x11x11+1
+        self.f1 = nn.Linear(485,300)
+        self.f2 = nn.Linear(300,100)
+        self.f3 = nn.Linear(100,50)
+        self.f4 = nn.Linear(50,25)
+        self.f5 = nn.Linear(25,9)
+        self.f6 = nn.Linear(9,8)
+        self.f7 = nn.Linear(8,5)
+
+        # report flag
+        self.report = False
+
+    def forward(self, foods, visions):
+        """
+        Args:
+            foods: The food states (nx1)
+            visions: The vision states (nx4x11x11)
+        
+        Returns:
+            0: nx5 tensor of qualities.
+        """
+        # Unpack state
+        food_float = foods.float().view((-1,1))
+        vision_float = visions.float().view((foods.size()[0], -1))
+
+        # Fully connected layers
+        # First flatten and concatenate
+        h = torch.cat((food_float,vision_float), dim=1)
+        # Run through the layers
+        h = F.relu(self.f1(h))
+        h = F.relu(self.f2(h))
+        h = F.relu(self.f3(h))
+        h = F.relu(self.f4(h))
+        h = F.relu(self.f5(h))
+        h = F.relu(self.f6(h))
+        Q = self.f7(h)
 
         if self.report:
             print(Q)
