@@ -31,7 +31,7 @@ def dump_parameters(brain, path):
 if __name__ == "__main__":
     # Some constants we will be using
     gamma = 0.8
-    lr_supervised = 0.0001
+    lr_supervised = 0.01
     lr_reinforcement = 0.001
     epochs = 5
     batches = 10
@@ -74,7 +74,7 @@ if __name__ == "__main__":
     # train.clean_data(paths, [s.replace('.txt', 'CLEAN.txt') for s in paths])
 
     # # Load brain from permanent memory
-    # monkey_brain.load_state_dict(torch.load('B10T0.brainsave'))
+    # monkey_brain.load_state_dict(torch.load('brainsave\\B11T2.brainsave'))
 
     # # Train the monkey
     # loss_report = train.Q_supervised_training(2, 6, paths, \
@@ -85,23 +85,23 @@ if __name__ == "__main__":
     #     monkey_brain, lr_supervised)
 
     # Train the monkey
-    loss_report = train.supervised_columns(100, 20, paths, monkey_brain, \
+    loss_report = train.supervised_columns(1000, 20, paths, monkey_brain, \
         gamma, max_discount, lr_supervised, 10, \
         intermediate='brainsave\\intermediate.brainsave')
 
     # Save the brain
-    torch.save(monkey_brain.state_dict(), 'brainsave\\B11T0.brainsave')
+    torch.save(monkey_brain.state_dict(), 'brainsave\\B12T0.brainsave')
 
-    # out_f = open('out.txt', 'a')
-    # out_f.write(str(loss_report))
-    # out_f.write('\n')
-    # out_f.close()
-    # plt.title('Supervised Training lr' + str(lr_supervised) + \
-    #     ' ' + str(paths)[:12])
-    # plt.xlabel('Batch number (3 epochs of 6 batches)')
-    # plt.ylabel('Average Loss per Data Point')
-    # plt.plot(*zip(*loss_report))
-    # plt.show()
+    out_f = open('out.txt', 'a')
+    out_f.write(str(loss_report))
+    out_f.write('\n')
+    out_f.close()
+    plt.title('Supervised Training lr' + str(lr_supervised) + \
+        ' ' + str(paths)[:12])
+    plt.xlabel('Batch number (3 epochs of 6 batches)')
+    plt.ylabel('Average Loss per Data Point')
+    plt.plot(*zip(*loss_report))
+    plt.show()
 
     # # Load brain from permanent memory
     # monkey_brain.load_state_dict(torch.load('brainsave\\B11T0.brainsave'))

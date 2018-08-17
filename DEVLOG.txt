@@ -337,4 +337,16 @@ Monkey test (#3%, m0%, b5%, d1)
   B10T1 | 33.198, 33.267, 34.292, 33.666, 32.863
   B10T2 | 27.995, 27.075, 26.281, 25.824, 26.330
 
-I have rewritten the trainer to separate different lives of the monkey into different files. I have also changed the loss function to the L1 Clamp loss and am doing supervised learning with generated quality values again.
+I have rewritten the trainer to separate different lives of the monkey into different files. I have also changed the loss function to the L1 Clamp loss and am doing supervised learning with generated quality values again. We are also learning in *real* batches now.
+
+B11T0: Supervised lr0.001 gamma0.8 food20 epoch100 batch 20 life0-life500 OptAdam (#3%, m0%, b5%, d1%) [(0, tensor(7.1623)), (1, tensor(7.1423)), (2, tensor(7.0602)), (3, tensor(6.9052)), (4, tensor(6.7504)), (5, tensor(6.6127)), (6, tensor(6.4904)), (7, tensor(6.3826)), (8, tensor(6.3078)), (9, tensor(6.2494)), (10, tensor(6.1948)), (11, tensor(6.1360)), (12, tensor(6.0717)), (13, tensor(6.0000)), (14, tensor(5.9165)), (15, tensor(5.8169)), (16, tensor(5.6921)), (17, tensor(5.5462)), (18, tensor(5.3848)), (19, tensor(5.2134)), (20, tensor(5.0408)), (21, tensor(4.8792)), (22, tensor(4.7341)), (23, tensor(4.6085)), (24, tensor(4.4857)), (25, tensor(4.3721)), (26, tensor(4.2670)), (27, tensor(4.1720)), (28, tensor(4.0766)), (29, tensor(3.9796)), (30, tensor(3.8857)), (31, tensor(3.7805)), (32, tensor(3.6760)), (33, tensor(3.5674)), (34, tensor(3.4761)), (35, tensor(3.3747)), (36, tensor(3.2902)), (37, tensor(3.2192)), (38, tensor(3.1481)), (39, tensor(3.0864)), (40, tensor(3.0218)), (41, tensor(2.9620)), (42, tensor(2.8925)), (43, tensor(2.8362)), (44, tensor(2.7811)), (45, tensor(2.7318)), (46, tensor(2.6746)), (47, tensor(2.6494)), (48, tensor(2.5916)), (49, tensor(2.5658)), (50, tensor(2.5262)), (51, tensor(2.4887)), (52, tensor(2.4618)), (53, tensor(2.4462)), (54, tensor(2.4208)), (55, tensor(2.3813)), (56, tensor(2.3567)), (57, tensor(2.3687)), (58, tensor(2.3290)), (59, tensor(2.2982)), (60, tensor(2.2862)), (61, tensor(2.2695)), (62, tensor(2.2485)), (63, tensor(2.2278)), (64, tensor(2.2173)), (65, tensor(2.2115)), (66, tensor(2.1898)), (67, tensor(2.1743)), (68, tensor(2.1661)), (69, tensor(2.1520)), (70, tensor(2.1424)), (71, tensor(2.1230)), (72, tensor(2.1139)), (73, tensor(2.1091)), (74, tensor(2.0863)), (75, tensor(2.0749)), (76, tensor(2.0748)), (77, tensor(2.0602)), (78, tensor(2.0458)), (79, tensor(2.0402)), (80, tensor(2.0331)), (81, tensor(2.0191)), (82, tensor(2.0177)), (83, tensor(2.0042)), (84, tensor(2.0012)), (85, tensor(1.9917)), (86, tensor(1.9815)), (87, tensor(1.9771)), (88, tensor(1.9718)), (89, tensor(1.9602)), (90, tensor(1.9465)), (91, tensor(1.9392)), (92, tensor(1.9322)), (93, tensor(1.9322)), (94, tensor(1.9319)), (95, tensor(1.9278)), (96, tensor(1.9091)), (97, tensor(1.9065)), (98, tensor(1.9022)), (99, tensor(1.9008))]
+
+B11T0>B11T1: Supervised lr0.001 gamma0.8 food20 epoch100 batch 20 life0-life500 OptAdam
+B11T1>B11T2: Supervised lr0.0005 gamma0.8 food20 epoch100 batch 20 life0-life500 OptAdam
+
+Monkey test (#3%, m0%, b5%, d1)
+  Model | Score
+--------+-------
+  B11T0 | 4.201
+  B11T1 | 4.559
+  B11T2 | 2.812

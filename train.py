@@ -664,8 +664,11 @@ def supervised_columns(epochs, batches, paths, brain, gamma, \
     criterion = custom_loss.L1_clamp_loss
     # Create an optimizer
     optimizer = torch.optim.Adagrad(brain.parameters(), lr=lr)
+    # Learning rate decay
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5)
     loss_record = []
     # Iterate through epochs
+    previous_loss = torch.tensor(1E8)
     for epoch in range(epochs):
         total_loss = 0
         # Permute the data to decorrelate it.
@@ -697,7 +700,7 @@ def supervised_columns(epochs, batches, paths, brain, gamma, \
             # Update the weights
             optimizer.step()
             # Add to loss record
-            total_loss += loss.float()
+            total_loss += loss.item()
         if report:
             loss_record.append((epoch, total_loss/batches))
             print('Epoch', epoch, 'loss', total_loss/batches)
@@ -705,6 +708,11 @@ def supervised_columns(epochs, batches, paths, brain, gamma, \
         # Save brain
         if intermediate != '':
             torch.save(brain.state_dict(), intermediate)
+
+        # Update learning rate
+        val_loss = total_loss - previous_loss
+        previous_loss = total_loss
+        scheduler.step(val_loss)
 
     return loss_record
 
