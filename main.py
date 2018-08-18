@@ -38,20 +38,20 @@ if __name__ == "__main__":
     reports = 5
     N = 500
     epsilon_start = 0.1
-    epsilon_end = 0.05
+    epsilon_end = 0.01
     n_epsilon = 10000
     epsilon_tuple = (epsilon_start, epsilon_end, n_epsilon)
     def epsilon(n):
         return (epsilon_start - epsilon_end)*\
             math.exp(-(n+1)/n_epsilon) + epsilon_end
-    max_discount = 0.05
+    max_discount = 0.001
     CR_level = 2
     CR_block_index = 2
 
     # Create the map
     room_start = rg.rand_room(500, [0.03,0,0.05,0.01])
     # Create brain to train
-    monkey_brain = brain.BrainV5()#BrainDecisionAI(gamma, 4, -1, -50, save_Q=True)
+    monkey_brain = brain.BrainV4()#BrainDecisionAI(gamma, 4, -1, -50, save_Q=True)
     # Put brain in monkey in grid
     monkeys = [monkey.Monkey(monkey_brain)]
     monkeys[0].pos = (len(room_start[1])//2,len(room_start[2])//2)
@@ -74,7 +74,7 @@ if __name__ == "__main__":
     # train.clean_data(paths, [s.replace('.txt', 'CLEAN.txt') for s in paths])
 
     # # Load brain from permanent memory
-    # monkey_brain.load_state_dict(torch.load('brainsave\\B11T2.brainsave'))
+    # monkey_brain.load_state_dict(torch.load('brainsave\\B11T0.brainsave'))
 
     # # Train the monkey
     # loss_report = train.Q_supervised_training(2, 6, paths, \
@@ -84,43 +84,45 @@ if __name__ == "__main__":
     # loss_report = train.cross_entropy_supervised_training(8, 6, paths, \
     #     monkey_brain, lr_supervised)
 
-    # Train the monkey
-    loss_report = train.supervised_columns(1000, 20, paths, monkey_brain, \
-        gamma, max_discount, lr_supervised, 10, \
-        intermediate='brainsave\\intermediate.brainsave')
+    # # Train the monkey
+    # loss_report = train.supervised_columns(100, 325, paths, monkey_brain, \
+    #     gamma, max_discount, lr_supervised, 10, \
+    #     intermediate='brainsave\\intermediate.brainsave')
 
-    # Save the brain
-    torch.save(monkey_brain.state_dict(), 'brainsave\\B12T0.brainsave')
+    # out_f = open('out.txt', 'a')
+    # out_f.write(str(loss_report))
+    # out_f.write('\n')
+    # out_f.close()
+    # plt.title('Supervised Training lr' + str(lr_supervised) + \
+    #     ' ' + str(paths)[:12])
+    # plt.xlabel('Batch number (3 epochs of 6 batches)')
+    # plt.ylabel('Average Loss per Data Point')
+    # plt.plot(*zip(*loss_report))
+    # plt.show()
 
-    out_f = open('out.txt', 'a')
-    out_f.write(str(loss_report))
-    out_f.write('\n')
-    out_f.close()
-    plt.title('Supervised Training lr' + str(lr_supervised) + \
-        ' ' + str(paths)[:12])
-    plt.xlabel('Batch number (3 epochs of 6 batches)')
-    plt.ylabel('Average Loss per Data Point')
-    plt.plot(*zip(*loss_report))
-    plt.show()
+    # # Save the brain
+    # torch.save(monkey_brain.state_dict(), 'brainsave\\V4_480-200-16-8-4_T0.brainsave')
 
-    # # Load brain from permanent memory
-    # monkey_brain.load_state_dict(torch.load('brainsave\\B11T0.brainsave'))
+    # Load brain from permanent memory
+    monkey_brain.load_state_dict(torch.load('brainsave\\V4_480-200-16-8-4_T0.brainsave'))
 
-    # Model testing
-    test_results = []
-    for r in range(5):
-        g.monkeys[0].brain.pi = g.monkeys[0].brain.pi_greedy
-        test_results.append(train.test_model(g, 1000, 30))        
-        g.monkeys[0].brain.pi = g.monkeys[0].brain.pi_epsilon_greedy
-        print(test_results)
-    exit()
 
-    # Watch monkey train
-    monkey_brain.report = True
-    train.curated_bananas_dqn(g_CR, CR_level, 20, gamma, 0, 20, \
-        block_index = CR_block_index, watch = True)
-    train.dqn_training(g, 60, gamma, 0, watch = True)
-    monkey_brain.report = False
+    # # Model testing
+    # g.monkeys[0].brain.pi = g.monkeys[0].brain.pi_greedy
+    # print(train.test_model(g, 100, 30))  
+    # test_results = []
+    # for r in range(5):
+    #     test_results.append(train.test_model(g, 1000, 30))        
+    #     print(test_results)
+    # g.monkeys[0].brain.pi = g.monkeys[0].brain.pi_epsilon_greedy
+    # exit()
+
+    # # Watch monkey train
+    # monkey_brain.report = True
+    # train.curated_bananas_dqn(g_CR, CR_level, 20, gamma, 0, 20, \
+    #     block_index = CR_block_index, watch = True)
+    # train.dqn_training(g, 60, gamma, 0, watch = True)
+    # monkey_brain.report = False
 
     # # Curated learning 
     # loss_report = train.curated_bananas_dqn(g_CR, CR_level, 4000, gamma, \
@@ -129,10 +131,10 @@ if __name__ == "__main__":
 
     # Reinforcment learning on a room that is 500x500 and 3% bananas
     loss_report = train.dqn_training(g, 50000, gamma, lr_reinforcement, \
-    epsilon = epsilon, watch = False)
+    epsilon = lambda x: 0.3, watch = False)
 
     # Save the brain
-    torch.save(monkey_brain.state_dict(), 'B10T3.brainsave')
+    torch.save(monkey_brain.state_dict(), 'brainsave\\V4_480-200-16-8-4_T1.brainsave')
 
     out_f = open('out.txt', 'a')
     out_f.write(str(loss_report))
@@ -144,6 +146,16 @@ if __name__ == "__main__":
     # plt.ylim(0,6)
     plt.plot(*zip(*loss_report))
     plt.show()
+
+    # Model testing
+    g.monkeys[0].brain.pi = g.monkeys[0].brain.pi_greedy
+    print(train.test_model(g, 100, 30))  
+    test_results = []
+    for r in range(5):
+        test_results.append(train.test_model(g, 1000, 30))        
+        print(test_results)
+    g.monkeys[0].brain.pi = g.monkeys[0].brain.pi_epsilon_greedy
+    exit()
 
     train.curated_bananas_dqn(g_CR, CR_level, 20, gamma, 0, 20, \
         block_index = CR_block_index, watch = True)

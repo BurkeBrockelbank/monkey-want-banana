@@ -29,3 +29,10 @@ def L1_clamp_loss(Q, Q_pi, a):
 
     loss = torch.sum(delta, dim=1)
     return loss
+
+def L1_no_clamp(Q, Q_pi, a):
+    """
+    This calculates the loss as just the L1 loss between Q[a] and Q_pi.
+    """
+    loss = torch.abs(Q[range(len(Q)), a]-Q_pi)
+    return loss

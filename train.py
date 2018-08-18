@@ -475,7 +475,6 @@ def supervised_training(epochs, batches, paths, brain, gamma, \
     all_data = []
 
     # First read all training data
-    all_lines = []
     for path in paths:
         print('Reading', path)
         in_f = open(path, 'r')
@@ -483,7 +482,6 @@ def supervised_training(epochs, batches, paths, brain, gamma, \
         in_f.close()
         # parse the input lines
         data = [eval(x.rstrip()) for x in in_lines]
-        all_lines.append(data)
         # As a reminder, the data structure is
         # food (int), action (int),board state (torch.tensor dtype=torch.uint8)
         # Now we need to calculate the quality for each of these
@@ -585,7 +583,8 @@ def supervised_training(epochs, batches, paths, brain, gamma, \
 def supervised_columns(epochs, batches, paths, brain, gamma, \
     max_discount, lr, report = True, intermediate = ''):
     """
-    This performs supervised training on the monkey. 
+    This performs supervised training on the monkey. First path is assumed to
+    point to the validation set.
     
     Args:
         N: The number of epochs to run in training.
@@ -609,7 +608,6 @@ def supervised_columns(epochs, batches, paths, brain, gamma, \
     all_data = []
 
     # First read all training data
-    all_lines = []
     for path in paths:
         print('Reading', path)
         in_f = open(path, 'r')
@@ -617,7 +615,6 @@ def supervised_columns(epochs, batches, paths, brain, gamma, \
         in_f.close()
         # parse the input lines
         data = [eval(x.rstrip()) for x in in_lines]
-        all_lines.append(data)
         # As a reminder, the data structure is
         # food (int), action (int),board state (torch.tensor dtype=torch.uint8)
         # Now we need to calculate the quality for each of these
@@ -645,16 +642,15 @@ def supervised_columns(epochs, batches, paths, brain, gamma, \
     n_to_cut = math.ceil(math.log(max_discount)/math.log(gamma))
     all_data = [x[:-n_to_cut] for x in all_data]
     # And now we have processed the data
+    # Separate the validation set
+    validation_set = all_data[0]
+    all_data = all_data[1:]
 
     # Concatenate the data sets.
     data_set = [el for one_path in all_data for el in one_path]
 
     # Calculate batch data
     batch_length = len(data_set)//batches
-
-    # Due to symmetry, we can increase the data set eightfold.
-    data_symmetric = []
-    # Still unimplemented
 
     # Report status
     print('Data loaded')
@@ -665,10 +661,12 @@ def supervised_columns(epochs, batches, paths, brain, gamma, \
     # Create an optimizer
     optimizer = torch.optim.Adagrad(brain.parameters(), lr=lr)
     # Learning rate decay
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, \
+        factor=0.5, verbose = report)
     loss_record = []
+    if report:
+        print(batches, 'batches of', batch_length, 'data points')
     # Iterate through epochs
-    previous_loss = torch.tensor(1E8)
     for epoch in range(epochs):
         total_loss = 0
         # Permute the data to decorrelate it.
@@ -678,6 +676,7 @@ def supervised_columns(epochs, batches, paths, brain, gamma, \
         for batch_no in range(batches-1):
             batch_start = batch_no*batch_length
             batched_data.append(data_set[batch_start:batch_start+batch_length])
+        # The final batch gets the remaining points (less than number of batches)
         batched_data.append(data_set[(batches-1)*batch_length:])
 
         # Iterate through data
@@ -687,12 +686,10 @@ def supervised_columns(epochs, batches, paths, brain, gamma, \
             foods = torch.tensor(column_data[1])
             actions = torch.tensor(column_data[2])
             visions = torch.stack(column_data[3])
-            # print(real_Q_vec[:3])
-            # print(foods[:3])
-            # print(actions[:3])
-            # print(visions.size())
             predicted_Qs = brain.forward(foods, visions)
             loss = torch.mean(criterion(predicted_Qs, real_Q_vec, actions))
+            # print('prediction', predicted_Qs[0])
+            # print('Q(s,', gl.WASD[actions[0]], ') = ', real_Q_vec[0], sep='')
             # Zero the gradients
             optimizer.zero_grad()
             # perform a backward pass
@@ -701,18 +698,29 @@ def supervised_columns(epochs, batches, paths, brain, gamma, \
             optimizer.step()
             # Add to loss record
             total_loss += loss.item()
-        if report:
-            loss_record.append((epoch, total_loss/batches))
-            print('Epoch', epoch, 'loss', total_loss/batches)
 
         # Save brain
         if intermediate != '':
             torch.save(brain.state_dict(), intermediate)
 
+        # Validata data
+        brain.eval()
+        column_data = list(zip(*validation_set))
+        real_Q_vec = torch.stack(column_data[0])
+        foods = torch.tensor(column_data[1])
+        actions = torch.tensor(column_data[2])
+        visions = torch.stack(column_data[3])
+        predicted_Qs = brain.forward(foods, visions)
+        loss = torch.mean(criterion(predicted_Qs, real_Q_vec, actions))
+        val_loss = loss.item()
+        brain.train()
         # Update learning rate
-        val_loss = total_loss - previous_loss
-        previous_loss = total_loss
         scheduler.step(val_loss)
+
+
+        if report:
+            loss_record.append((epoch, total_loss/batches))
+            print('Epoch', epoch, 'loss', total_loss/batches, 'Validation loss', val_loss)
 
     return loss_record
 

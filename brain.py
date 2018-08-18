@@ -806,14 +806,10 @@ class BrainV4(BrainDQNColumns):
 
         # Create fully connected layers
         # Input is 4x11x11+1
-        self.f1 = nn.Linear(485,300)
-        self.f2 = nn.Linear(300,100)
-        self.f3 = nn.Linear(100,50)
-        self.f4 = nn.Linear(50,25)
-        self.f5 = nn.Linear(25,9)
-        self.f6 = nn.Linear(9,8)
-        self.f7 = nn.Linear(8,5)
-
+        self.f1 = nn.Linear(485,200)
+        self.f2 = nn.Linear(200,80)
+        self.f3 = nn.Linear(80,40)
+        self.f4 = nn.Linear(40,5)
         # report flag
         self.report = False
 
@@ -837,17 +833,14 @@ class BrainV4(BrainDQNColumns):
         h = F.relu(self.f1(h))
         h = F.relu(self.f2(h))
         h = F.relu(self.f3(h))
-        h = F.relu(self.f4(h))
-        h = F.relu(self.f5(h))
-        h = F.relu(self.f6(h))
-        Q = self.f7(h)
+        Q = self.f4(h)
 
         if self.report:
             print(Q)
 
         return Q
 
-class BrainV5(BrainDQN):
+class BrainV5(BrainDQNColumns):
     """
     This is the same as brain v3 but it inherits from the BrainDQNColumns class
 
@@ -888,11 +881,12 @@ class BrainV5(BrainDQN):
             0: (nx5) tensor of qualities.
         """
         food_float = foods.float().view((-1,1))
-        vision_float = visions.float().view((foods.size()[0], -1))
+        vision_float = visions.float()
 
         # Fine branch
         h_fine = vision_float[:,:,3:-3,3:-3]
-        h_fine = h_fine.view((-1,25))
+        # Need to make h_fine contiguous in memory before flattening
+        h_fine = h_fine.contiguous().view((len(foods),-1))
 
         # Convolutional layers
         h_conv = F.relu(self.c1(vision_float))
@@ -903,8 +897,104 @@ class BrainV5(BrainDQN):
         h_conv = h_conv.view((len(foods),-1))
 
         # Combine branches and food
-        h = torch.cat((foods, h_fine, h_conv), dim=0)
-        print(h_fine.size(), h_conv.size(), h.size())
+        h = torch.cat((food_float, h_fine, h_conv), dim=1)
+
+        # Fully connected layers
+        # Add in food
+        h = F.relu(self.f1(h))
+        h = F.relu(self.f2(h))
+        h = F.relu(self.f3(h))
+        Q = self.f4(h)
+
+        if self.report:
+            print(Q)
+
+        return Q
+
+class BrainV6(BrainV5):
+    def __init__(self):
+        """
+        Initialize the architecture of the neural net.
+        """
+        # Initialize the parent class
+        super(BrainV6, self).__init__()
+        # Set the default policy
+        self.pi = self.pi_epsilon_greedy
+
+        # Fine branch
+
+        # Convolutional branch
+        self.c1 = nn.Conv2d(4,12,3,padding=1)
+        self.c2 = nn.Conv2d(12,6,4)
+        self.c3 = nn.Conv2d(6,2,4)
+
+        # Create fully connected layers
+        self.f1 = nn.Linear(151,25)
+        self.f2 = nn.Linear(25,9)
+        self.f3 = nn.Linear(9,8)
+        self.f4 = nn.Linear(8,5)
+
+        # report flag
+        self.report = False
+
+class BrainV7(BrainDQNColumns):
+    """
+    This is the same as brain v3 but it inherits from the BrainDQNColumns class
+
+    This brain has no memory implementation.
+    """
+    def __init__(self):
+        """
+        Initialize the architecture of the neural net.
+        """
+        # Initialize the parent class
+        BrainDQNColumns.__init__(self)
+        # Set the default policy
+        self.pi = self.pi_epsilon_greedy
+
+        # Fine branch
+
+        # Convolutional branch
+        self.c1 = nn.Conv2d(4,8,3,padding=1)
+        self.c2 = nn.Conv2d(8,6,3)
+        self.p3 = nn.MaxPool2d(2)
+
+        # Create fully connected layers
+        self.f1 = nn.Linear(197,25)
+        self.f2 = nn.Linear(25,9)
+        self.f3 = nn.Linear(9,8)
+        self.f4 = nn.Linear(8,5)
+
+        # report flag
+        self.report = False
+
+    def forward(self, foods, visions):
+        """
+        Args:
+            foods: The food states (n)
+            visions: The vision states (nx4x11x11)
+        
+        Returns:
+            0: (nx5) tensor of qualities.
+        """
+        food_float = foods.float().view((-1,1))
+        vision_float = visions.float()
+
+        # Fine branch
+        h_fine = vision_float[:,:,3:-3,3:-3]
+        # Need to make h_fine contiguous in memory before flattening
+        h_fine = h_fine.contiguous().view((len(foods),-1))
+
+        # Convolutional layers
+        h_conv = F.relu(self.c1(vision_float))
+        h_conv = F.relu(self.c2(h_conv))
+        h_conv = F.relu(self.p3(h_conv))
+
+        # Flatten Convolutional branch
+        h_conv = h_conv.view((len(foods),-1))
+
+        # Combine branches and food
+        h = torch.cat((food_float, h_fine, h_conv), dim=1)
 
         # Fully connected layers
         # Add in food

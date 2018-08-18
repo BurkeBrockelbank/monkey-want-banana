@@ -350,3 +350,40 @@ Monkey test (#3%, m0%, b5%, d1)
   B11T0 | 4.201
   B11T1 | 4.559
   B11T2 | 2.812
+
+
+So I have stopped recording everything but I suppose I should write my findings. Firstly, I impolemented ReduceLROnPlateau and am using Adagrad again.
+
+I have discovered that BrainV4 isn't really a suitable architecture.  BrainV4 trains to 0.67 on the training set (life1-life19) but gives a loss of 0.95 on the validation set (life0) whereas brain V5 trains to 0.79 on the trainin set and 0.84 on the validation set. Clearly the addition of the convolution is preventing overfitting and allowing for a moregeneralized fit to the underlying pattern of the data. This was not with the L1_clamp_loss but the L1_no_clamp loss. With L1_clamp_loss these numbers go to 0.98, 1.63, 1.07 and 1.29 respectively. This leads to the same conclusion.
+
+I increased the training set to (life1-life99) and the loss and validation loss are staying closer together (1.18, 1.26). This is good, as it means that the generality is increasing. However, this is still not good enough. I will have to devise a new architecture.
+
+Going back to (life1-life19) for brevity. Brain V6 gives (0.91, 1.12). It scores 12!!!!! All I did was expand the convolutional branch for brain 6. I will make it bigger for version 7
+
+Convolutions are specified as (kernel size, padding, stride)
+
+vision                  & vision                         & food
+(4x11x11)               & (4x11x11)                      & 1
+(4x5x5) Crop            & (12x11x11) Conv2d(3,1,1) ReLU  & 1
+(4x5x5) Crop            & (12x11x11) Conv2d(3,1,1) ReLU  & 1
+(4x5x5)                 & (6x8x8) Conv2d(4,0,1) ReLU     & 1
+(4x5x5)                 & (2x5x5) Conv2d(4,0,1) ReLU     & 1
+(4x5x5)                 & (2x5x5)                        & 1
+150 Flatten             & 1
+151 Concat
+25 Relu
+9 Relu
+8 Relu
+5
+
+V7 does slightly better in terms of generality (0.94, 1.06). Fewer epochs were done. OMG IT SCORED A 21!!! It is self sustaining! I am having trouble reproducing this. This lack of reproducability may be a reason to look at some sort of simulated annealing. I couldn't reproduce the V7 result but I could reproduce the V6 result (0.98, 1.16) and scored 14.
+
+I have been playing around. It turns out the batch size is VERY important. I didn't know this.
+
+I moved onto life1-life199 and did 100 epochs of 130 batches (256 data points each batch) and got losses (0.82,0.89). I tested the model and scored (25.294, 25.320, 23.63, 24.804, 23.655). Loss seemed to cap out. To recall, the AI performs in the range of a score of 43.
+
+I want to try a really deep fully connected network because I still have a hunch that convolutions are too coarse grain for a problem like this. When I solve this problem, I don't even think about that. If I were to guess how the net works, I would say that in the first hidden layer, every node represents a path that the monkey could take and its value would be the quality of that move. Let's say it only considers paths with 6 moves. Ther number of paths is 15625 but the vast majority of these paths are plain dumb. Perhaps there are only a few hundred "intelligent" paths. Then the first hidden layer has maybe 400 nodes. Now, 100 of these say the first move is 'w', 100 for 'a', and so on. Theyse 100 nodes need to decide which among them has the highest quality. It could get the maximum quite well with a couple layers of size 20 and 10 respectively (I guess). So that gives a second hidden layer of size 80 and a third hidden layer of size 40. Then we just have 5 possible moves these feed into. I think I can do this in brain V4.
+
+Wow! I didn't expect this! It is overfitting like crazy (0.34, 0.83) scoring (37.935, 38.048, 37.867, 38.729, 38.981). Not to mention it runs MUCH faster than the AI. I am going to try paring down the size of the maximum finders by a factor of 5. Scored 27 after that. I want to increase its expressive power by giving it access to more path possibilities. 1000 possible paths. It didn't really help (0.23, 0.83) score (35.19). 300 possible paths. (0.47, 0.83) (35.97). 200 paths. (0.48, 80) (38.56) 150 paths (0.53, 0.88) (37.81). 80 paths (0.66, 0.84) (34.92).
+
+I will stick with 200 in the first layer. The overfitting is indicative of room to change later on for optimization. I will try again with all the data: 100 epochs of 325 batches of 244 data points. It is getting a better validation score now! (0.57, 0.75) (37.818, 38.887, 39.011, 39.760, 38.483). Save is in brainsave\V4_480-200-16-8-4_T0.brainsave. Now doing reinforcement learning. It made it worse (31.803), but that is kind of expected. I will try training for longer.
