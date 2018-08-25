@@ -28,6 +28,9 @@ def dump_parameters(brain, path):
     out_F.write(str(list(brain.parameters())))
     out_F.close()
 
+rg.png_to_channel('img\\AdventureMapBananaLavaShrunk.png', [(0,0,0), (128,64,0), (255,242,0), (237,28,36)])
+exit()
+
 if __name__ == "__main__":
     # Some constants we will be using
     gamma = 0.8
@@ -37,7 +40,7 @@ if __name__ == "__main__":
     batches = 10
     reports = 5
     N = 500
-    epsilon_start = 0.1
+    epsilon_start = 0.7
     epsilon_end = 0.01
     n_epsilon = 10000
     epsilon_tuple = (epsilon_start, epsilon_end, n_epsilon)
@@ -104,7 +107,7 @@ if __name__ == "__main__":
     # torch.save(monkey_brain.state_dict(), 'brainsave\\V4_480-200-16-8-4_T0.brainsave')
 
     # Load brain from permanent memory
-    monkey_brain.load_state_dict(torch.load('brainsave\\V4_480-200-16-8-4_T0.brainsave'))
+    monkey_brain.load_state_dict(torch.load('brainsave\\V4_480-200-16-8-4_T1_WP.brainsave'))
 
 
     # # Model testing
@@ -129,12 +132,12 @@ if __name__ == "__main__":
     #     lr_reinforcement, 20, block_index = CR_block_index, \
     #     random_start = False, epsilon = lambda x: epsilon(x))
 
-    # Reinforcment learning on a room that is 500x500 and 3% bananas
-    loss_report = train.dqn_training(g, 50000, gamma, lr_reinforcement, \
-    epsilon = lambda x: 0.3, watch = False)
+    # Reinforcment learning
+    loss_report = train.dqn_training(g, 1000000, gamma, lr_reinforcement, \
+    epsilon = lambda x: 0.05, watch = False, test_report = True)
 
     # Save the brain
-    torch.save(monkey_brain.state_dict(), 'brainsave\\V4_480-200-16-8-4_T1.brainsave')
+    torch.save(monkey_brain.state_dict(), 'brainsave\\V4_480-200-16-8-4_T2_WP.brainsave')
 
     out_f = open('out.txt', 'a')
     out_f.write(str(loss_report))

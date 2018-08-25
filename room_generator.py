@@ -18,6 +18,8 @@ import torch
 import torch.nn as nn
 
 import random
+import numpy as np
+from PIL import Image
 
 import global_variables as gl
 import exceptions
@@ -224,3 +226,35 @@ def play_record(path):
         print('food', food)
         print(channel_to_ASCII(board))
         input('>>>' + gl.WASD[action])
+
+def png_to_channel(path, rgb_list):
+    """
+    This function reads a png and turns it into a channel map.
+
+    Args:
+        path: The path to the png image.
+        rgb_list: A parallel list with gl.BLOCK_TYPES that says what the rgb values
+            of each block type are. List of tuples.
+
+    Returns:
+        0: Channel map.
+    """
+    # Turn rgb list into tensor
+    rgb = torch.tensor(rgb_list, dtype=torch.uint8)
+    # Open the file as a tensor
+    img = Image.open(path)
+    img.load()
+    img = img.convert('RGB')
+    width, height = img.size
+    img = list(img.getdata())
+    img = torch.tensor(img, dtype=torch.uint8)
+    img = img.view((height,width,3))
+    # Create a new tensor to be the channel map
+    channels = torch.zeros((len(gl.BLOCK_TYPES), height, width), dtype=torch.uint8)
+    # Populate the channel map
+    for layer in range(len(gl.BLOCK_TYPES)):
+        for i in range(height):
+            for j in range(width):
+                if all(img[i,j] == rgb[layer]):
+                    channels[layer, i, j] = 1
+    return channels

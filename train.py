@@ -17,6 +17,7 @@ import global_variables as gl
 import exceptions
 import room_generator as rg
 import custom_loss
+import monkey
 
 import math
 import random
@@ -979,7 +980,7 @@ def curated_bananas_dqn(g, level, N, gamma, lr, food, random_start = False, \
 
 
 def dqn_training(g, N, gamma, lr, \
-    epsilon = lambda x: 0, watch = False):
+    epsilon = lambda x: 0, watch = False, test_report = False):
     """
     This function trains a monkey with reinforcement learning.
 
@@ -1044,6 +1045,7 @@ def dqn_training(g, N, gamma, lr, \
 
 
     loss_record = []
+    test_record = []
 
     # Percentile reports
     one_percent = N//100
@@ -1054,6 +1056,16 @@ def dqn_training(g, N, gamma, lr, \
     for n in range(N):
         if n%one_percent == 0:
             print('Learning is ', n//one_percent, '% complete.', sep='')
+            if test_report:
+                g.monkeys[0].brain.eval()
+                g.monkeys[0].brain.pi = g.monkeys[0].brain.pi_greedy
+                test_result = test_model(g, 50, 30)
+                print(test_result)
+                test_record.append((n,test_result))
+                if epsilon_needed:
+                    g.monkeys[0].brain.pi = g.monkeys[0].brain.pi_epsilon_greedy
+                g.monkeys[0].brain.train()
+
         if watch:
             print('-----------------------')
 
@@ -1110,7 +1122,74 @@ def dqn_training(g, N, gamma, lr, \
         loss.backward(retain_graph= (n!=N-1))
         optimizer.step()
 
+    if test_report:
+        return test_record
     return loss_record
+
+def dqn_training_columns(brain, rooms, epochs, gamma, lr, \
+    epsilon = lambda x: 0, watch = False):
+    """
+    This function trains a monkey with reinforcement learning. This function
+    trains in batches, however, and runs on many simultanous game boards
+
+    The DQN algorithm for each point in a batch.
+    1) Get the policy's action.
+    2) Get the consequent state (move the monkey).
+    3) Get the immediate reward from the grid.
+    4) Calculate the loss
+        a) Calculate the quality of the move undertaken Q(s,a).
+        b) Calculate the max_a Q(s',a) where s' is the consequent
+           state of performing a from the state s.
+        c) delta = Q(s,a) - r - gamma*max_a Q(s', a)
+           where r is the immediate loss measured from the system.
+        d) Loss is the Huber loss (smooth L1 loss) of delta.
+
+    Args:
+        brain: The brain that runs every monkey in every room.
+        rooms: A list of rooms to use. Batch size is inferred from the length
+            of this list.
+        epochs: The number of epochs of training.
+        gamma: The discount for the Bellman equation.
+        epsilon: Default lambda function returning zero. A function that gives
+            the value for epsilon based on epoch number.
+        lr: The learning rate.
+        watch: Default False. If True, will wait for the user to look at every
+            iteration of the training.
+
+    Returns:
+        0: Training data in the form of list of tuples. First element is
+        iteration number, second number is average loss over the
+        iterations leading up to this report.
+    """
+    # First generate all the grids.
+    grids = []
+    for channel_map in rooms:
+        # Create a new monkey
+        new_monkey = monkey.Monkey(brain)
+
+        # Find a good position for the monkey
+        bad_position = True
+        while bad_position:
+            new_i = random.randrange(channel_map.size()[0])
+            new_j = random.randrange(channel_map.size()[1])
+            if all(channel_map[new_i, new_j, :] == torch.zeros(len(gl.BLOCK_TYPES))):
+                bad_position = False
+        new_monkey.pos = (new_i, new_j)
+
+        # Create a new grid
+        new_grid = grid.Grid([new_monkey], channel_map)
+
+        # Add the grid to the list
+        grids.append(new_grid)
+
+    # Unpack epsilon if it exists
+    epsilon_needed = False
+    if g.monkeys[0].brain.pi == g.monkeys[0].brain.pi_epsilon_greedy:
+        epsilon_needed = True
+
+    # Generate the first run
+
+
 
 def test_model(g, N, reset):
     """
