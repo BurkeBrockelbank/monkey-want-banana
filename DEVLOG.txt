@@ -412,3 +412,11 @@ T2: [(0, 24.72), (10000, 35.88), (20000, 35.2), (30000, 36.76), (40000, 44.68), 
 So we see it is not training past the efficiency of the AI, but it has developed a stable Q function that performs at about 85% of the score of the AI. The question now is whether we can find a situation (like a real game room) where we can train the monkey to play better than the AI.
 
 Making a new map based on the Cogmind procedurally generated map https://www.gridsagegames.com/blog/gsg-content/uploads/2014/06/cogmind_map_tunnelers_even.png
+
+I have the map reader working. So now I should test the AI and the NN on this map.
+T2 score (18.224, 16.990,, 16.967, 17.394, 16.272)
+AI score (31.335, 30.405, 30.910 29.125, 29.51)
+
+So the AI is scoring much better than the NN. Maybe I should generate more training data on a very large map to train on. Anyway, for now I will try just training the NN on the map.
+
+T3: Same as T2 except for ...T2_WP.brainsave --> ...T3_WP.brainsave score 7.896, 7.015, 7.805, 6.965, 6.943.

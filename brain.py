@@ -1069,7 +1069,6 @@ class BrainDecisionAI(BrainDQN):
             banana_locations))
         banana_sort.sort()
 
-
         for banana_distance, uniquifier, banana_location in banana_sort:
             has_path, path = self.__has_path__(channels, banana_location)
             if has_path and len(path) > 0:
@@ -1102,9 +1101,21 @@ class BrainDecisionAI(BrainDQN):
             moves += [gl.WASD.index('a')]*abs(relative_location[1])
         else:
             moves += [gl.WASD.index('d')]*relative_location[1]
-        for perm in itertools.permutations(moves):
-            if self.__valid_path__(channels, location, perm):
+
+        possible_paths = list(set(itertools.permutations(moves)))
+        while len(possible_paths) > 0:
+            # print('possible_paths', len(possible_paths), 'e.g', moves)
+            perm = possible_paths[0]
+            path_validity, fail_index = self.__valid_path__(channels, location, perm)
+            if path_validity:
                 return True, tuple(perm)
+            else:
+                # Path to index
+                path_to_fail = perm[:fail_index+1]
+                # print('Oh that was a bad path', path_to_fail)
+                for fail_perm in set(itertools.permutations(path_to_fail)):
+                    # print('Deleting everything starting with', fail_perm)
+                    possible_paths = [x for x in possible_paths if x[:fail_index+1] != fail_perm]
         return False, tuple()
 
 
@@ -1122,7 +1133,7 @@ class BrainDecisionAI(BrainDQN):
         0: Boolean
         """
         pos = (gl.RADIUS, gl.RADIUS)
-        for action in path:
+        for action_index, action in enumerate(path):
             symbol = gl.WASD[action]
             if symbol  == 'a':
                 pos = (pos[0], pos[1]-1)
@@ -1139,8 +1150,8 @@ class BrainDecisionAI(BrainDQN):
                 # The way is clear:
                 pass
             else:
-                return False
-        return True
+                return False, action_index
+        return True, -1
 
 
     def __quality_event__(self, immediate_reward, turn):

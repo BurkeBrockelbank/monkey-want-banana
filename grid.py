@@ -158,7 +158,7 @@ class Grid:
                 Q, action, probability = monkey.brain.pi((monkey.food, surr))
                 # Get the string action
                 action_string = gl.WASD[action]
-                # Print out the action if loud and wait are is on
+                # Print out the action if loud
                 if monkey_index in loud:
                     if wait:
                         input('>>>'+action_string+' '+str(probability))
