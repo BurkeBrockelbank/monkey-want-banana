@@ -49,7 +49,7 @@ if __name__ == "__main__":
     CR_block_index = 2
 
     # Create the map
-    room_start = rg.png_to_channel('img\\AdventureMapBananaLavaShrunk.png', [(0,0,0), (128,64,0), (255,242,0), (237,28,36)])#rg.rand_room(500, [0.03,0,0.05,0.01])
+    room_start = rg.rand_room(500, [0.03,0,0.05,0.01])#rg.png_to_channel('img\\AdventureMapBananaLavaShrunk.png', [(0,0,0), (128,64,0), (255,242,0), (237,28,36)])
     # Create brain to train
     monkey_brain = brain.BrainV4()#BrainDecisionAI(gamma, 4, -1, -50, save_Q=True)
     # Put brain in monkey in grid
@@ -59,10 +59,10 @@ if __name__ == "__main__":
     g_CR = grid.Grid(monkeys, room_start)
 
     # Make data paths for the monkey training data
-    paths = ['data\\life'+str(i)+'.dat' for i in range(500)]
+    paths = ['data\\life_adventure'+str(i)+'.dat' for i in range(500)]
 
     # # Generate training data
-    # train.monkey_training_data_1_life(100000, 250, 'data\\life', g, loud = [])
+    # train.monkey_training_data_1_life(100000, 250, 'data\\life_random', g, loud = [])
     # exit()
     
 
@@ -70,8 +70,8 @@ if __name__ == "__main__":
 
     # train.clean_data(paths, [s.replace('.txt', 'CLEAN.txt') for s in paths])
 
-    # # Load brain from permanent memory
-    # monkey_brain.load_state_dict(torch.load('brainsave\\B11T0.brainsave'))
+    # Load brain from permanent memory
+    monkey_brain.load_state_dict(torch.load('brainsave\\V4_480-200-16-8-4_T2_WP.brainsave'))
 
     # # Train the monkey
     # loss_report = train.Q_supervised_training(2, 6, paths, \
@@ -81,10 +81,10 @@ if __name__ == "__main__":
     # loss_report = train.cross_entropy_supervised_training(8, 6, paths, \
     #     monkey_brain, lr_supervised)
 
-    # # Train the monkey
-    # loss_report = train.supervised_columns(100, 325, paths, monkey_brain, \
-    #     gamma, max_discount, lr_supervised, 10, \
-    #     intermediate='brainsave\\intermediate.brainsave')
+    # Train the monkey
+    loss_report = train.supervised_columns(100, 325, paths, monkey_brain, \
+        gamma, max_discount, lr_supervised, 10, \
+        intermediate='brainsave\\intermediate.brainsave')
 
     # out_f = open('out.txt', 'a')
     # out_f.write(str(loss_report))
@@ -97,11 +97,11 @@ if __name__ == "__main__":
     # plt.plot(*zip(*loss_report))
     # plt.show()
 
-    # # Save the brain
-    # torch.save(monkey_brain.state_dict(), 'brainsave\\V4_480-200-16-8-4_T0.brainsave')
+    # Save the brain
+    torch.save(monkey_brain.state_dict(), 'brainsave\\V4_480-200-16-8-4_T3_WP.brainsave')
 
-    # Load brain from permanent memory
-    monkey_brain.load_state_dict(torch.load('brainsave\\V4_480-200-16-8-4_T2_WP.brainsave'))
+    # # Load brain from permanent memory
+    # monkey_brain.load_state_dict(torch.load('brainsave\\V4_480-200-16-8-4_T2_WP.brainsave'))
 
     # monkey_brain.pi = monkey_brain.pi_greedy
     # for i in range(4000):
@@ -129,12 +129,12 @@ if __name__ == "__main__":
     #     lr_reinforcement, 20, block_index = CR_block_index, \
     #     random_start = False, epsilon = lambda x: epsilon(x))
 
-    # Reinforcment learning
-    loss_report = train.dqn_training(g, 1000000, gamma, lr_reinforcement, \
-    epsilon = lambda x: 0.05, watch = False, test_report = True)
+    # # Reinforcment learning
+    # loss_report = train.dqn_training(g, 1000000, gamma, lr_reinforcement, \
+    # epsilon = lambda x: 0.05, watch = False, test_report = True)
 
-    # Save the brain
-    torch.save(monkey_brain.state_dict(), 'brainsave\\V4_480-200-16-8-4_T3_WP.brainsave')
+    # # Save the brain
+    # torch.save(monkey_brain.state_dict(), 'brainsave\\V4_480-200-16-8-4_T3_WP.brainsave')
 
     out_f = open('out.txt', 'a')
     out_f.write(str(loss_report))
