@@ -71,6 +71,9 @@ INDEX_DANGER = BLOCK_TYPES.index('d')
 # Define movement symbols
 WASD = 'wasd '
 
+# Reward
+DEATH_REWARD = -10
+
 # Start with the basic room
 ROOM_START_ASCII =  '##################################\n'+\
                     '#  b                   #  b      #\n'+\

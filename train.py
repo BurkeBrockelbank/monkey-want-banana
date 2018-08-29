@@ -22,6 +22,9 @@ import monkey
 import math
 import random
 
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import axes3d
+
 def monkey_training_data_1_life(N, life_span, path_root, g, loud = []):
     """
     This generates black-box style training data, but every life of the monkey
@@ -581,6 +584,285 @@ def supervised_training(epochs, batches, paths, brain, gamma, \
 
     return loss_record
 
+def load_data_paths(paths, gamma, max_discount):
+    """
+    This loads in data paths and claculates gamma for each data point with a
+    truncation error defined by max_discount.
+
+    Args:
+        paths: A list of paths leading to the data files.
+        gamma: The discount factor in the Bellman equation.
+        max_discount: The maximum factor to allow for discount in calculating
+        qualities.
+    """
+    for path in paths:
+        print('Reading', path)
+        in_f = open(path, 'r')
+        in_lines = in_f.readlines()
+        in_f.close()
+        # parse the input lines
+        data = [eval(x.rstrip()) for x in in_lines]
+        # As a reminder, the data structure is
+        # food (int), action (int),board state (torch.tensor dtype=torch.uint8)
+        # Now we need to calculate the quality for each of these
+        food_vals = [x[0] for x in data]
+        # We now will subtract subsequent food values to get the change in food
+        food_diffs = [food_vals[i]-food_vals[i-1] for i in \
+            range(1,len(food_vals))]
+        # Delete the final row of data because it has no food difference
+        # that can be calculated 
+        new_data = data[:-1]
+        # Calculate qualities
+        quals = [0]
+        for food_diff in food_diffs[::-1]:
+            quals.append(quals[-1]*gamma+food_diff)
+        quals = quals[1:]
+        quals = quals[::-1]
+        # Insert the quality into the data
+        new_data = [(torch.tensor(quality),) + state_tuple \
+            for state_tuple, quality in zip(new_data, quals)]
+        # Add to the list of data sets
+        all_data.append(new_data)
+    # Since the final quality values concatenate the series short, we should
+    # cut those data points. We will arbitrarily decide to ignore rewards which
+    # have a reduction in magnitute by the factor max_discount.
+    n_to_cut = math.ceil(math.log(max_discount)/math.log(gamma))
+    all_data = [x[:-n_to_cut] for x in all_data]
+    # Concatenate the data sets.
+    data_set = [el for one_path in all_data for el in one_path]
+
+    return data_set
+
+def split_batches(data_set, batches, batch_length):
+    """
+    This function splits a data set into batches. Extra points are added to the final batch.
+
+    Args:
+        data_set: The data set to split.
+        batches: The number of batches to do.
+        batch_length: The length of a batch.
+
+    Returns:
+        0: Iterable of all the batches.
+    """
+    for batch_no in range(batches-1):
+        batch_start = batch_no*batch_length
+        yield data_set[batch_start:batch_start+batch_length]
+    # The final batch gets the remaining points (less than number of batches)
+    yield data_set[(batches-1)*batch_length:]
+
+def grid_search_supervised(brain_class, max_epochs, batch_range, lr_range, paths, \
+    gamma, max_discount, data_dir):
+    """
+    This performs a grid search on the number of batches to have and the learning
+    rate to use.
+
+    Args:
+        max_epochs: The maximum number of epochs that are allowed. Training is halted
+            when the loss on the training set drops below 80% of the loss on the
+            validation set.
+        batch_range: Tuple (min, max, N) of the minimum and maximum number of batches
+            to test and how many batch numbers to test. Changed linearly.
+        lr_range: Tuple (min, max, N) of the minimum and maximum learning rate to
+            test and how many learning rates to test. Changed logarithmically.
+        paths: The paths to the data.
+        brain_class: Since the brain is recreated several times, just pass the
+            class in and it will be instantiated here.
+        paths: A list of paths leading to the data files.
+        gamma: The discount factor in the Bellman equation.
+        max_discount: The maximum factor to allow for discount in calculating
+        qualities.
+        data_dir: The directory where plots and data are saved.
+
+    Returns:
+
+    """
+    # First build the grid of hyperparameters
+    print('Building hyperparameters...')
+    batch_step = (batch_range[1]-batch_range[0])//batch_range[2]
+    batch_grid = torch.arange(batch_range[0], batch_range[1], batch_step, \
+        dtype = torch.int)
+    lr_grid = torch.logspace(*lr_range)
+
+    # Read in the data
+    print('Reading data...')
+    data_set = load_data_paths(paths, gamma, max_discount)
+
+    # Split off the validation and test sets with 60/20/20 split
+    percent_20_length = len(data_set)//5
+    validation_set = data_set[:percent_20_length]
+    data_set = data_set[percent_20_length:]
+    test_set = data_set[:percent_20_length]
+    data_set = data_set[percent_20_length:]
+
+    # Define the loss criterion
+    criterion = custom_loss.L1_clamp_loss
+
+    # Record for losses for the grid search
+    grid_record = []
+    plot_batch = torch.zeros(len(batch_grid), len(lr_grid))
+    plot_lr = torch.zeros(len(batch_grid), len(lr_grid))
+    plot_training = torch.zeros(len(batch_grid), len(lr_grid))
+    plot_val = torch.zeros(len(batch_grid), len(lr_grid))
+    plot_test = torch.zeros(len(batch_grid), len(lr_grid))
+
+    # Now iterate through the grid
+    for batch_index, batches in enumerate(batch_grid):
+        # Calculate batch data
+        batch_length = len(data_set)//batches
+        for lr_index, lr in enumerate(lr_grid):
+            # Create record for training and validation loss over epochs
+            grid_point_record = []
+
+            # Instantiate brain
+            brain = brain_class()
+            brain.train()
+
+            # Create optimizer and scheduler
+            optimizer = torch.optim.Adagrad(brain.parameters(), lr=lr)
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, \
+                factor=0.5, verbose = report)
+
+            print('Training net...')
+
+            # Run through epochs.
+            epoch = 0
+            overfit = False
+            while epoch < max_epoch and not overfit:
+                # Permute the data to decorrelate it.
+                random.shuffle(data_set)
+                # Separate into batches
+                batched_data = list(split_batches(data_set, batches, batch_length))
+
+                # Iterate through data
+                total_loss = 0
+                for batch_no, batch_set in enumerate(batched_data):
+                    column_data = list(zip(*batch_set))
+                    real_Q_vec = torch.stack(column_data[0])
+                    foods = torch.tensor(column_data[1])
+                    actions = torch.tensor(column_data[2])
+                    visions = torch.stack(column_data[3])
+                    predicted_Qs = brain.forward(foods, visions)
+                    loss = criterion(predicted_Qs, real_Q_vec, actions).mean()
+                    # print('prediction', predicted_Qs[0])
+                    # print('Q(s,', gl.WASD[actions[0]], ') = ', real_Q_vec[0], sep='')
+                    # Zero the gradients
+                    optimizer.zero_grad()
+                    # perform a backward pass
+                    loss.backward()
+                    # Update the weights
+                    optimizer.step()
+                    # Add to loss record
+                    total_loss += loss.item()
+                training_loss = total_loss/batches
+
+                # Validata data
+                brain.eval()
+                column_data = list(zip(*validation_set))
+                real_Q_vec = torch.stack(column_data[0])
+                foods = torch.tensor(column_data[1])
+                actions = torch.tensor(column_data[2])
+                visions = torch.stack(column_data[3])
+                predicted_Qs = brain.forward(foods, visions)
+                loss = criterion(predicted_Qs, real_Q_vec, actions).mean()
+                val_loss = loss.item()
+                brain.train()
+
+                # Add to record
+                grid_point_record.append((epoch, training_loss, val_loss))
+
+                # Update learning rate
+                scheduler.step(val_loss)
+
+                # Check for overfitting
+                if training_loss/val_loss < 0.8:
+                    overfit = True
+
+                # Update epoch
+                epoch += 1
+            print(batches, lr, 'ran with', epoch, 'epochs')
+
+            print('Comparing to test set...')
+            # Calculate loss on test set
+            brain.eval()
+            column_data = list(zip(*test_set))
+            real_Q_vec = torch.stack(column_data[0])
+            foods = torch.tensor(column_data[1])
+            actions = torch.tensor(column_data[2])
+            visions = torch.stack(column_data[3])
+            predicted_Qs = brain.forward(foods, visions)
+            loss = criterion(predicted_Qs, real_Q_vec, actions).mean()
+            test_loss = loss.item()
+            brain.train()
+
+            # Save the data for this grid point
+            grid_record.append((batches, lr, training_loss, val_loss, test_loss))
+
+            # Save data in plotting data structure
+            plot_batch[batch_index, lr_index] = batches
+            plot_lr[batch_index, lr_index] = lr
+            plot_training[batch_index, lr_index] = training_loss
+            plot_val[batch_index, lr_index] = val_loss
+            plot_test[batch_index, lr_index] = test_loss
+
+            # Save training record
+            point_path = data_dir + 'batch' + str(batches) + 'lr' + str(lr)
+            plt.plot(*zip(*grid_point_record))
+            plt.save(point_path + '.png')
+            plt.clf()
+            out_f = open(point_path+'.dat','w')
+            for epoch, training_loss, val_loss in grid_point_record:
+                out_f.write(str(epoch))
+                out_f.write(' ')
+                out_f.write(str(training_loss))
+                out_f.write(' ')
+                out_f.write(str(val_loss))
+                out_f.write('\n')
+            out_f.close()
+
+            # Save the brain at the end of training
+            torch.save(brain.state_dict(), point_path + '.brainsave')
+
+    print('Finishing up...')
+    # Write the data for the grid search
+    out_f = open(data_dir+'.dat', 'w')
+    for batches, lr, training_loss, val_loss, test_loss in grid_record:
+        out_f.write(str(batches))
+        out_f.write(' ')
+        out_f.write(str(lr))
+        out_f.write(' ')
+        out_f.write(str(training_loss))
+        out_f.write(' ')
+        out_f.write(str(val_loss))
+        out_f.write(' ')
+        out_f.write(str(test_loss))
+        out_f.write('\n')
+    out_f.close()
+
+    # Generate plots for search
+    plt.figure().add_subplot(111, projection='3d')\
+        .plot_wireframe(plot_batch, plot_lr, plot_training)
+    plt.save(data_dit+'training.png')
+    plt.close()
+
+    plt.figure().add_subplot(111, projection='3d')\
+        .plot_wireframe(plot_batch, plot_lr, plot_val)
+    plt.save(data_dit+'val.png')
+    plt.close()
+
+    plt.figure().add_subplot(111, projection='3d')\
+        .plot_wireframe(plot_batch, plot_lr, plot_test)
+    plt.save(data_dit+'test.png')
+    plt.close()
+
+    plt.figure().add_subplot(111, projection='3d')\
+        .plot_wireframe(plot_batch, plot_lr, plot_training, plot_val, plot_test)
+    plt.save(data_dit+'all.png')
+    plt.close()
+
+
+
+
 def supervised_columns(epochs, batches, paths, brain, gamma, \
     max_discount, lr, report = True, intermediate = ''):
     """
@@ -597,6 +879,7 @@ def supervised_columns(epochs, batches, paths, brain, gamma, \
         lr: The learning rate to use.
         reports: The number of times to print progress.
         intermediate: The file to save intermediate brain trainings to.
+        validation_index: Which file to use for the validation set
 
 
     Returns:
@@ -643,12 +926,16 @@ def supervised_columns(epochs, batches, paths, brain, gamma, \
     n_to_cut = math.ceil(math.log(max_discount)/math.log(gamma))
     all_data = [x[:-n_to_cut] for x in all_data]
     # And now we have processed the data
-    # Separate the validation set
-    validation_set = all_data[0]
-    all_data = all_data[1:]
 
     # Concatenate the data sets.
     data_set = [el for one_path in all_data for el in one_path]
+
+    # Shuffle the data set
+    random.shuffle(data_set)
+    # Pull out the validation set
+    validation_length = len(data_set)//5
+    validation_set = data_set[:validation_length]
+    data_set = data_set[validation_length:]
 
     # Calculate batch data
     batch_length = len(data_set)//batches
@@ -688,7 +975,7 @@ def supervised_columns(epochs, batches, paths, brain, gamma, \
             actions = torch.tensor(column_data[2])
             visions = torch.stack(column_data[3])
             predicted_Qs = brain.forward(foods, visions)
-            loss = torch.mean(criterion(predicted_Qs, real_Q_vec, actions))
+            loss = criterion(predicted_Qs, real_Q_vec, actions).mean()
             # print('prediction', predicted_Qs[0])
             # print('Q(s,', gl.WASD[actions[0]], ') = ', real_Q_vec[0], sep='')
             # Zero the gradients
@@ -712,15 +999,16 @@ def supervised_columns(epochs, batches, paths, brain, gamma, \
         actions = torch.tensor(column_data[2])
         visions = torch.stack(column_data[3])
         predicted_Qs = brain.forward(foods, visions)
-        loss = torch.mean(criterion(predicted_Qs, real_Q_vec, actions))
+        loss = criterion(predicted_Qs, real_Q_vec, actions).mean()
         val_loss = loss.item()
         brain.train()
+
         # Update learning rate
         scheduler.step(val_loss)
 
 
         if report:
-            loss_record.append((epoch, total_loss/batches))
+            loss_record.append((epoch, total_loss/batches, val_loss))
             print('Epoch', epoch, 'loss', total_loss/batches, 'Validation loss', val_loss)
 
     return loss_record
@@ -934,7 +1222,7 @@ def curated_bananas_dqn(g, level, N, gamma, lr, food, random_start = False, \
             r = state_new[0]-state_old[0]
             # If the monkey is dead, it instead gets a large penalty
             if g.monkeys[0].dead:
-                r = -50
+                r = gl.DEATH_REWARD
                 g.monkeys[0].dead = False
                 end_state = True
 
@@ -980,7 +1268,7 @@ def curated_bananas_dqn(g, level, N, gamma, lr, food, random_start = False, \
 
 
 def dqn_training(g, N, gamma, lr, \
-    epsilon = lambda x: 0, watch = False, test_report = False):
+    epsilon = lambda x: 0, watch = False):
     """
     This function trains a monkey with reinforcement learning.
 
@@ -1045,7 +1333,6 @@ def dqn_training(g, N, gamma, lr, \
 
 
     loss_record = []
-    test_record = []
 
     # Percentile reports
     one_percent = N//100
@@ -1055,16 +1342,17 @@ def dqn_training(g, N, gamma, lr, \
     # Iterate N times
     for n in range(N):
         if n%one_percent == 0:
-            print('Learning is ', n//one_percent, '% complete.', sep='')
-            if test_report:
-                g.monkeys[0].brain.eval()
-                g.monkeys[0].brain.pi = g.monkeys[0].brain.pi_greedy
-                test_result = test_model(g, 50, 30)
-                print(test_result)
-                test_record.append((n,test_result))
-                if epsilon_needed:
-                    g.monkeys[0].brain.pi = g.monkeys[0].brain.pi_epsilon_greedy
-                g.monkeys[0].brain.train()
+            report_string = 'Learning is ' + str(n//one_percent) + \
+                '% complete. epsilon = ' + str(round(epsilon(n),3))
+            g.monkeys[0].brain.eval()
+            g.monkeys[0].brain.pi = g.monkeys[0].brain.pi_greedy
+            test_result = test_model(g, 40, 30, loud=False)
+            report_string += '. Score ' + str(test_result)
+            if epsilon_needed:
+                g.monkeys[0].brain.pi = g.monkeys[0].brain.pi_epsilon_greedy
+            g.monkeys[0].brain.train()
+
+            print(report_string)
 
         if watch:
             print('-----------------------')
@@ -1086,7 +1374,7 @@ def dqn_training(g, N, gamma, lr, \
         r = state_new[0]-state_old[0]
         # If the monkey is dead, it instead gets a large penalty
         if g.monkeys[0].dead:
-            r = -50
+            r = gl.DEATH_REWARD
             # If the monkey died of hunger, feed it.
             if g.monkeys[0].food < 0:
                 g.monkeys[0].eat(5)
@@ -1106,7 +1394,7 @@ def dqn_training(g, N, gamma, lr, \
         delta = Q - r - gamma * Q_new
         # d) Calculate the loss as Huber loss.
         loss = criterion(delta, torch.zeros(1))
-        loss_record.append((n,float(loss)))
+        loss_record.append((n,float(loss),test_result))
 
         if watch:
             print(gl.WASD[a], 'with probability', p)
@@ -1122,8 +1410,6 @@ def dqn_training(g, N, gamma, lr, \
         loss.backward(retain_graph= (n!=N-1))
         optimizer.step()
 
-    if test_report:
-        return test_record
     return loss_record
 
 def dqn_training_columns(brain, rooms, epochs, gamma, lr, \
@@ -1191,7 +1477,7 @@ def dqn_training_columns(brain, rooms, epochs, gamma, lr, \
 
 
 
-def test_model(g, N, reset):
+def test_model(g, N, reset, loud=True):
     """
     This function will test the first monkey in the grid given for its
     score in the game after N resets of some number of turns each. The
@@ -1201,6 +1487,7 @@ def test_model(g, N, reset):
         g: The grid that the monkeys are on.
         N: The number of resets to do.
         reset: The number of turns per reset.
+        loud: Whether to report progress or not.
 
     Returns:
         0: Average score over all resets.
@@ -1214,8 +1501,8 @@ def test_model(g, N, reset):
 
     # Iterate over resets.
     for n in range(N):
-        if n%50 == 0:
-            print('Reset', n)
+        if (n+1)%50 == 0 and loud:
+            print('Reset', n+1)
 
         # Randomize position
         invalid_spot = True
