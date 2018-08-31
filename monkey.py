@@ -58,6 +58,9 @@ class Monkey:
             0: The number of bananas the monkey didn't want.
         """
         # Eat all of the bananas
+        # if n>1:
+        #     input('You ready for this?')
+        #     input(n)
         self.bananas += n
         self.food += self.food_per_banana*n
         return 0

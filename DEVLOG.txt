@@ -437,3 +437,5 @@ Now doing neural net training.
 I have changed to a reward of -10 for death. Having a such a big penalty was causing too many issues with the fit.
 
 Just finished the initial training on the adventure room. 100 epochs of 300 batches of 132 points. Overfitting after 20 epochs. It is scoring a 20 though, not great. I am going to increase the dataset size. I think I am going to have to implement a grid search test to find hyperparameters. Learning rate is too high, batch number isn't clear, etc.
+
+So I was having a lot of trouble, then I finally decided to take a look at the training data and it was crazy. I don't know what happened. Some of it was the random room, some of it was the adventure map. I really can't say what happened. Regerating only 50000 points now.

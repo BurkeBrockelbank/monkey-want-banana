@@ -11,19 +11,55 @@ from __future__ import division
 
 import torch
 import torch.nn as nn
-import matplotlib.pyplot as plt
 
 import global_variables as gl
 import exceptions
 import room_generator as rg
 import custom_loss
 import monkey
+import grid
 
 import math
 import random
 
+import numpy as np
+
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import axes3d
+
+class PlateauFlagger:
+    """
+    This class keeps track of validation losses and returns a boolean
+    every step to say whether it has plateaued.
+    """
+    def __init__(self, patience):
+        self.patience = patience
+        self.epochs = 0
+        self.bad_epochs = 0
+        self.best_loss = None
+
+    def step(self, val_loss):
+        """
+        Returns:
+            0: Boolean. True if the validation has plateaued, False otherwise
+        """
+        self.epochs += 1
+        if self.epochs == 1:
+            self.best_loss = val_loss
+            return False
+
+        elif val_loss < self.best_loss:
+            self.best_loss = val_loss
+            self.bad_epochs = 0
+            return False
+        
+        elif self.bad_epochs > self.patience:
+            return True
+
+        else:
+            self.bad_epochs += 1
+            return True
+
 
 def monkey_training_data_1_life(N, life_span, path_root, g, loud = []):
     """
@@ -595,8 +631,8 @@ def load_data_paths(paths, gamma, max_discount):
         max_discount: The maximum factor to allow for discount in calculating
         qualities.
     """
+    all_data = []
     for path in paths:
-        print('Reading', path)
         in_f = open(path, 'r')
         in_lines = in_f.readlines()
         in_f.close()
@@ -651,8 +687,81 @@ def split_batches(data_set, batches, batch_length):
     # The final batch gets the remaining points (less than number of batches)
     yield data_set[(batches-1)*batch_length:]
 
+def plot_grid_record(plot_batch, plot_lr, plot_training, plot_val, \
+    plot_test, plot_score, save_dir):
+    """
+    Plots a grid record and saves it to save_path.
+
+    Args:
+
+    """
+    # Everything should have the same scale, so find the min and max
+    vmin = min(plot_training.min(), plot_val.min(), plot_test.min())
+    vmax = max(plot_training.max(), plot_val.max(), plot_test.max())
+    levels = np.linspace(vmin,vmax,20)
+
+    plt.clf()
+
+    # Training set
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    ax.set_title('Training')
+    ax.set_xlabel('Batch size')
+    ax.set_ylabel('Learning Rate')
+    ax.set_yscale('log')
+    pcm = ax.contourf(plot_batch, plot_lr, plot_training, \
+        levels=levels, cmap=plt.get_cmap('viridis'))
+    plt.colorbar(pcm, ax=ax, orientation='horizontal', fraction=0.15, \
+        extend='both')
+    plt.savefig(save_dir+'train.png')
+    plt.clf()
+
+    # Validation set
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    ax.set_title('Validation')
+    ax.set_xlabel('Batch size')
+    ax.set_ylabel('Learning Rate')
+    ax.set_yscale('log')
+    pcm = ax.contourf(plot_batch, plot_lr, plot_val, \
+        levels=levels, cmap=plt.get_cmap('viridis'))
+    plt.colorbar(pcm, ax=ax, orientation='horizontal', fraction=0.15, \
+        extend='both')
+    plt.savefig(save_dir+'val.png')
+    plt.clf()
+
+    # Test set
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    ax.set_title('Test')
+    ax.set_xlabel('Batch size')
+    ax.set_ylabel('Learning Rate')
+    ax.set_yscale('log')
+    pcm = ax.contourf(plot_batch, plot_lr, plot_test, \
+        levels=levels, cmap=plt.get_cmap('viridis'))
+    plt.colorbar(pcm, ax=ax, orientation='horizontal', fraction=0.15, \
+        extend='both')
+    plt.savefig(save_dir+'test.png')
+    plt.clf()
+
+    # Score
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    ax.set_title('Score')
+    ax.set_xlabel('Batch size')
+    ax.set_ylabel('Learning Rate')
+    ax.set_yscale('log')
+    pcm = ax.contourf(plot_batch, plot_lr, plot_score, \
+        cmap=plt.get_cmap('cubehelix'))
+    plt.colorbar(pcm, ax=ax, orientation='horizontal', fraction=0.15, \
+        extend='both')
+    plt.savefig(save_dir+'score.png')
+    plt.clf()
+
+
+
 def grid_search_supervised(brain_class, max_epochs, batch_range, lr_range, paths, \
-    gamma, max_discount, data_dir):
+    gamma, max_discount, scoring_room, data_dir):
     """
     This performs a grid search on the number of batches to have and the learning
     rate to use.
@@ -672,17 +781,23 @@ def grid_search_supervised(brain_class, max_epochs, batch_range, lr_range, paths
         gamma: The discount factor in the Bellman equation.
         max_discount: The maximum factor to allow for discount in calculating
         qualities.
+        scoring_room: The room in which to calculate the score of the monkey.
         data_dir: The directory where plots and data are saved.
 
     Returns:
 
     """
+    # Define colors
+    c_train = 'blue'
+    c_val = 'orange'
     # First build the grid of hyperparameters
     print('Building hyperparameters...')
     batch_step = (batch_range[1]-batch_range[0])//batch_range[2]
     batch_grid = torch.arange(batch_range[0], batch_range[1], batch_step, \
-        dtype = torch.int)
-    lr_grid = torch.logspace(*lr_range)
+        dtype = torch.int).tolist()
+    lr_grid = torch.logspace(*lr_range).tolist()
+    print('Batches', batch_grid)
+    print('lr', lr_grid)
 
     # Read in the data
     print('Reading data...')
@@ -694,17 +809,24 @@ def grid_search_supervised(brain_class, max_epochs, batch_range, lr_range, paths
     data_set = data_set[percent_20_length:]
     test_set = data_set[:percent_20_length]
     data_set = data_set[percent_20_length:]
+    print('training set:', len(data_set))
+    print('validation set:', len(validation_set))
+    print('test set:', len(test_set))
+    print('total:', len(data_set)+len(validation_set)+len(test_set))
 
     # Define the loss criterion
     criterion = custom_loss.L1_clamp_loss
 
     # Record for losses for the grid search
     grid_record = []
-    plot_batch = torch.zeros(len(batch_grid), len(lr_grid))
-    plot_lr = torch.zeros(len(batch_grid), len(lr_grid))
-    plot_training = torch.zeros(len(batch_grid), len(lr_grid))
-    plot_val = torch.zeros(len(batch_grid), len(lr_grid))
-    plot_test = torch.zeros(len(batch_grid), len(lr_grid))
+    plot_batch = np.zeros((len(batch_grid), len(lr_grid)), dtype=np.int_)
+    plot_lr = np.zeros_like(plot_batch, dtype=float)
+    plot_training = np.zeros_like(plot_lr)
+    plot_val = np.zeros_like(plot_lr)
+    plot_test = np.zeros_like(plot_lr)
+    plot_score = np.zeros_like(plot_lr)
+
+    print('Training nets...')
 
     # Now iterate through the grid
     for batch_index, batches in enumerate(batch_grid):
@@ -716,19 +838,20 @@ def grid_search_supervised(brain_class, max_epochs, batch_range, lr_range, paths
 
             # Instantiate brain
             brain = brain_class()
+            brain.pi = brain.pi_greedy
             brain.train()
 
             # Create optimizer and scheduler
-            optimizer = torch.optim.Adagrad(brain.parameters(), lr=lr)
+            optimizer = torch.optim.Adam(brain.parameters(), lr=lr)
             scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, \
-                factor=0.5, verbose = report)
-
-            print('Training net...')
+                verbose = True, patience = 5)
+            flagger = PlateauFlagger(10)
 
             # Run through epochs.
             epoch = 0
             overfit = False
-            while epoch < max_epoch and not overfit:
+            stagnant = False
+            while epoch < max_epochs and not overfit and not stagnant:
                 # Permute the data to decorrelate it.
                 random.shuffle(data_set)
                 # Separate into batches
@@ -774,15 +897,18 @@ def grid_search_supervised(brain_class, max_epochs, batch_range, lr_range, paths
                 # Update learning rate
                 scheduler.step(val_loss)
 
+                # Check for plateau
+                if flagger.step(val_loss):
+                    stagnant = True
+
                 # Check for overfitting
-                if training_loss/val_loss < 0.8:
+                elif training_loss/val_loss < 0.6:
                     overfit = True
 
                 # Update epoch
                 epoch += 1
             print(batches, lr, 'ran with', epoch, 'epochs')
 
-            print('Comparing to test set...')
             # Calculate loss on test set
             brain.eval()
             column_data = list(zip(*test_set))
@@ -795,20 +921,31 @@ def grid_search_supervised(brain_class, max_epochs, batch_range, lr_range, paths
             test_loss = loss.item()
             brain.train()
 
+            # Calculate score
+            brain.eval()
+            g = grid.Grid([monkey.Monkey(brain)], scoring_room)
+            score = test_model(g, 50, 30, loud=False)
+            brain.train()
+
             # Save the data for this grid point
-            grid_record.append((batches, lr, training_loss, val_loss, test_loss))
+            grid_record.append((batches, lr, training_loss, val_loss, test_loss, score))
 
             # Save data in plotting data structure
-            plot_batch[batch_index, lr_index] = batches
+            plot_batch[batch_index, lr_index] = batch_length
             plot_lr[batch_index, lr_index] = lr
             plot_training[batch_index, lr_index] = training_loss
             plot_val[batch_index, lr_index] = val_loss
             plot_test[batch_index, lr_index] = test_loss
+            plot_score[batch_index, lr_index] = score
 
             # Save training record
             point_path = data_dir + 'batch' + str(batches) + 'lr' + str(lr)
-            plt.plot(*zip(*grid_point_record))
-            plt.save(point_path + '.png')
+            epoch_data = [x[0] for x in grid_point_record]
+            training_epoch_data = [x[1] for x in grid_point_record]
+            validation_epoch_data = [x[2] for x in grid_point_record]
+            plt.plot(training_epoch_data, c=c_train)
+            plt.plot(validation_epoch_data, c=c_val)
+            plt.savefig(point_path + '.png')
             plt.clf()
             out_f = open(point_path+'.dat','w')
             for epoch, training_loss, val_loss in grid_point_record:
@@ -825,8 +962,8 @@ def grid_search_supervised(brain_class, max_epochs, batch_range, lr_range, paths
 
     print('Finishing up...')
     # Write the data for the grid search
-    out_f = open(data_dir+'.dat', 'w')
-    for batches, lr, training_loss, val_loss, test_loss in grid_record:
+    out_f = open(data_dir+'search.dat', 'w')
+    for batches, lr, training_loss, val_loss, test_loss, score in grid_record:
         out_f.write(str(batches))
         out_f.write(' ')
         out_f.write(str(lr))
@@ -836,29 +973,44 @@ def grid_search_supervised(brain_class, max_epochs, batch_range, lr_range, paths
         out_f.write(str(val_loss))
         out_f.write(' ')
         out_f.write(str(test_loss))
+        out_f.write(' ')
+        out_f.write(str(score))
         out_f.write('\n')
     out_f.close()
 
     # Generate plots for search
-    plt.figure().add_subplot(111, projection='3d')\
-        .plot_wireframe(plot_batch, plot_lr, plot_training)
-    plt.save(data_dit+'training.png')
-    plt.close()
+    plot_grid_record(plot_batch, plot_lr, plot_training, plot_val, \
+        plot_test, plot_score, data_dir)
 
-    plt.figure().add_subplot(111, projection='3d')\
-        .plot_wireframe(plot_batch, plot_lr, plot_val)
-    plt.save(data_dit+'val.png')
-    plt.close()
+    # plt.figure().add_subplot(111, projection='3d')\
+    #     .plot_wireframe(plot_batch, plot_lr, plot_training, \
+    #         colors = [c_train])
+    # plt.savefig(data_dir+'training.png')
+    # plt.close()
 
-    plt.figure().add_subplot(111, projection='3d')\
-        .plot_wireframe(plot_batch, plot_lr, plot_test)
-    plt.save(data_dit+'test.png')
-    plt.close()
+    # plt.figure().add_subplot(111, projection='3d')\
+    #     .plot_wireframe(plot_batch, plot_lr, plot_val, \
+    #         colors = [c_val])
+    # plt.savefig(data_dir+'val.png')
+    # plt.close()
 
-    plt.figure().add_subplot(111, projection='3d')\
-        .plot_wireframe(plot_batch, plot_lr, plot_training, plot_val, plot_test)
-    plt.save(data_dit+'all.png')
-    plt.close()
+    # plt.figure().add_subplot(111, projection='3d')\
+    #     .plot_wireframe(plot_batch, plot_lr, plot_test, \
+    #         colors = [c_test])
+    # plt.savefig(data_dir+'test.png')
+    # plt.close()
+
+    # plt.figure().add_subplot(111, projection='3d')\
+    #     .plot_wireframe(plot_batch, plot_lr, plot_training, \
+    #         colors = [c_train])
+    # plt.figure().add_subplot(111, projection='3d')\
+    #     .plot_wireframe(plot_batch, plot_lr, plot_val, \
+    #         colors = [c_val])
+    # plt.figure().add_subplot(111, projection='3d')\
+    #     .plot_wireframe(plot_batch, plot_lr, plot_test, \
+    #         colors = [c_test])
+    # plt.savefig(data_dir+'all.png')
+    # plt.close()
 
 
 
@@ -1264,8 +1416,144 @@ def curated_bananas_dqn(g, level, N, gamma, lr, food, random_start = False, \
 
     return loss_record
 
+def guided_dqn(g, test_g, N, gamma, lr, guide, watch=False):
+    """
+    Runs the DQN algorithm but instead of using pi_greedy or pi_epsilon greedy,
+    a guiding AI is used to decide on moves.
+
+    Args:
+        g: The grid containing a single monkey containing a brain of
+            superclass Brain_DQN.
+        test_g: The grid to test on. Make sure the of the monkey in the test grid
+            has the same instance of brain as the one in g
+        N: The number of iterations of training to do.
+        gamma: The discount for the Bellman equation.
+        lr: The learning rate.
+        guide: An instance of the brain class whose pi_greedy will be
+            consulted.
+        watch: Default False. If True, will wait for the user to look at every
+            iteration of the training.
+
+    Returns:
+        0: Training data in the form of list of tuples. First element is
+        iteration number, second number is average loss over the
+        iterations leading up to this report.
+    """
+    # Set monkey's pi to pi_greedy for scorekeeping
+    g.monkeys[0].brain.pi = g.monkeys[0].brain.pi_greedy
+
+    # Put the training brain in the test grid monkey
+    test_g.monkeys[0].brain = g.monkeys[0].brain
+
+    # Determine if we want to watch
+    if watch:
+        loud = [0]
+    else:
+        loud = []
+
+    # Instantiate total reward
+    total_reward = 0
+
+    # Calculate the state for the first time.
+    g.monkeys[0].brain.eval()
+    sight_new = g.surroundings(g.monkeys[0].pos)
+    food_new = g.monkeys[0].food
+    state_new = (food_new, sight_new)
+    Q_guide, a_guide, p_guide = guide.pi_greedy(state_new)
+    a_new = a_guide
+    p_new = p_guide
+    Q_new = g.monkeys[0].brain.Q(state_new, a_new)
+    g.monkeys[0].brain.train()
 
 
+    # Define optimizer
+    optimizer = torch.optim.Adam(g.monkeys[0].brain.parameters(), lr=lr)
+    # Define loss criterion
+    criterion = nn.SmoothL1Loss(size_average=False)
+
+
+    loss_record = []
+
+    # Percentile reports
+    one_percent = N//100
+    if one_percent == 0:
+        one_percent = N+1
+
+    # Iterate N times
+    for n in range(N):
+        if n%one_percent == 0:
+            report_string = 'Learning is ' + str(n//one_percent) + '% complete.'
+            test_g.monkeys[0].brain.eval()
+            test_result = test_model(test_g, 100, 30, loud=False)
+            report_string += '. Score ' + str(test_result)
+            test_g.monkeys[0].brain.train()
+
+            print(report_string)
+
+        if watch:
+            print('-----------------------')
+
+        # 1) Get the policy's action.
+        Q = Q_new
+        a = a_new
+        p = p_new
+
+        # 2) Get the consequent state (move the monkey).
+        g.tick(1, directions = [a], invincible = True, loud=loud, wait=False)
+        state_old = state_new
+        sight_new = g.surroundings(g.monkeys[0].pos)
+        food_new = g.monkeys[0].food
+        state_new = (food_new, sight_new)
+
+        # 3) Get the immediate reward.
+        # Immediate reward is normally food difference.
+        r = state_new[0]-state_old[0]
+        # If the monkey is dead, it instead gets a large penalty
+        if g.monkeys[0].dead:
+            r = gl.DEATH_REWARD
+            # If the monkey died of hunger, feed it.
+            if g.monkeys[0].food < 0:
+                g.monkeys[0].eat(5)
+                state_new = (g.monkeys[0].food, sight_new)
+                # Teleport the monkey
+                i, j = rg.free_spot(g.channel_map)
+                g.teleport_monkey(g.monkeys[0].pos, (i,j))
+                g.monkeys[0].pos = (i,j)
+            g.monkeys[0].dead = False
+        total_reward += r
+
+        # 4) Calculate the loss
+        # a) Calculate the quality of the move undertaken
+        # This was already done in part 1.
+        # b) Calculate the maximum quality of the subsequent move
+        Q_guide, a_guide, p_guide = guide.pi_greedy(state_new)
+        a_new = a_guide
+        p_new = p_guide
+        Q_new = g.monkeys[0].brain.Q(state_new, a_new)
+        # c) Calculate the loss difference
+        delta = Q - r - gamma * Q_new
+        # d) Calculate the loss as Huber loss.
+        loss = criterion(delta, torch.zeros(1))
+        if abs(r) > 7:
+            print(state_new[0], state_old[0])
+            input()
+        loss_record.append((n,float(loss),test_result))
+
+        if watch:
+            print(gl.WASD[a], 'with probability', p)
+            print('Q(s,', gl.WASD[a], ') = ', round(float(Q),3), sep='')
+            print('--> r + gamma * Q(s\',', gl.WASD[a_new], ')', sep='')
+            print('  = ', r, ' + ', gamma, ' * ', round(float(Q_new),3), sep='')
+            print('  = ', round(float(r+gamma*Q_new),3), sep='')
+            print('delta = ' + str(float(delta)))
+            input('loss = ' + str(float(loss)))
+
+        # Optimize the model
+        optimizer.zero_grad()
+        loss.backward(retain_graph= (n!=N-1))
+        optimizer.step()
+
+    return loss_record
 
 def dqn_training(g, N, gamma, lr, \
     epsilon = lambda x: 0, watch = False):
@@ -1346,7 +1634,7 @@ def dqn_training(g, N, gamma, lr, \
                 '% complete. epsilon = ' + str(round(epsilon(n),3))
             g.monkeys[0].brain.eval()
             g.monkeys[0].brain.pi = g.monkeys[0].brain.pi_greedy
-            test_result = test_model(g, 40, 30, loud=False)
+            test_result = test_model(g, 100, 30, loud=False)
             report_string += '. Score ' + str(test_result)
             if epsilon_needed:
                 g.monkeys[0].brain.pi = g.monkeys[0].brain.pi_epsilon_greedy
@@ -1512,7 +1800,7 @@ def test_model(g, N, reset, loud=True):
             # This spot can have a monkey placed on it
             if g.channel_map[gl.INDEX_BARRIER,i,j] == 0 and \
                 g.channel_map[gl.INDEX_DANGER,i,j] == 0:
-                # First teleport the monkey on the channel map
+                # First teleport the monkey on the channel map\
                 g.teleport_monkey(g.monkeys[0].pos, (i,j))
                 # Update the position in the monkey object
                 g.monkeys[0].pos = (i,j)

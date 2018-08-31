@@ -198,13 +198,8 @@ class Grid:
                     # Make sure the spot is empty
                     empty_spots = self.channel_map[:,i,j] == \
                         torch.zeros(len(gl.BLOCK_TYPES), dtype = torch.uint8)
-                    # Bananas and monkeys are alright, but we can't put a
-                    # banana in a barrier or danger.
-                    barrier_empty = empty_spots[gl.INDEX_BARRIER]\
-                        .item()
-                    danger_empty = empty_spots[gl.INDEX_DANGER]\
-                        .item()
-                    banana_placed = bool(barrier_empty and danger_empty)
+                    # Find a fresh spot with nothing on it to put a banana
+                    banana_placed = all(empty_spots)
                 # Put a banana there
                 self.channel_map[gl.INDEX_BANANA,i,j] += 1
             # Remove all the eaten bananas on this spot

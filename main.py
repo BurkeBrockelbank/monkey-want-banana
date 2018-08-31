@@ -31,14 +31,14 @@ def dump_parameters(brain, path):
 if __name__ == "__main__":
     # Some constants we will be using
     gamma = 0.8
-    lr_supervised = 0.01
-    lr_reinforcement = 0.0001
+    lr_supervised = 0.001
+    lr_reinforcement = 0.001
     epochs = 5
     batches = 10
     reports = 5
     N = 500
-    epsilon_start = 0.03
-    epsilon_end = 0.03
+    epsilon_start = 0.00
+    epsilon_end = 0.00
     n_epsilon = 20000
     epsilon_tuple = (epsilon_start, epsilon_end, n_epsilon)
     def epsilon(n):
@@ -50,25 +50,27 @@ if __name__ == "__main__":
 
     # Create the map
     # room_start = rg.rand_room(500, [0.03,0,0.05,0.01])
-    room_start = rg.png_to_channel('img\\AdventureMapBananaLavaShrunk.png', [(0,0,0), (128,64,0), (255,242,0), (237,28,36)])
+    room_start = rg.png_to_channel('img\\AdventureMapBananaLavaShrunkMoreBananas.png', [(0,0,0), (128,64,0), (255,242,0), (237,28,36)])
     # Create brain to train
-    monkey_brain = brain.BrainV4()
-    # monkey_brain = brain.BrainDecisionAI(gamma, 4, -1, gl.DEATH_REWARD, save_Q=True)
+    monkey_brain = brain.BrainV8()
+    AI_brain = brain.BrainDecisionAI(gamma, 4, -1, gl.DEATH_REWARD, save_Q=True)
     # Put brain in monkey in grid
     monkeys = [monkey.Monkey(monkey_brain)]
+    test_monkeys = [monkey.Monkey(monkey_brain)]
     monkeys[0].pos = (len(room_start[1])//2,len(room_start[2])//2)
+    test_monkeys[0].pos = (len(room_start[1])//2,len(room_start[2])//2)
     g = grid.Grid(monkeys, room_start)
-    g_CR = grid.Grid(monkeys, room_start)
+    test_g = grid.Grid(test_monkeys, room_start.clone())
 
-    # Make data paths for the monkey training data
-    paths = ['data\\life_adventure'+str(i)+'.dat' for i in range(300)]
+    # # Make data paths for the monkey training data
+    # paths = ['data\\life'+str(i)+'.dat' for i in range(600)]
 
     # # Generate training data
-    # train.monkey_training_data_1_life(100000, 250, 'data\\life_random', g, loud = [])
+    # train.monkey_training_data_1_life(50000, 250, 'data\\life', g, loud = [])
     # exit()
     
 
-    # rg.play_record('AIQ\\AIQ.txt')
+    # rg.play_record('data\\life300.dat')
 
     # train.clean_data(paths, [s.replace('.txt', 'CLEAN.txt') for s in paths])
 
@@ -83,45 +85,45 @@ if __name__ == "__main__":
     # loss_report = train.cross_entropy_supervised_training(8, 6, paths, \
     #     monkey_brain, lr_supervised)
 
-    # Grid search
-    train.grid_search_supervised(brain.BrainV4, 40, (250, 750, 5), (0.001,0.01,5), paths, \
-    gamma, max_discount, 'grid_search\\grid')
+    # # Grid search
+    # train.grid_search_supervised(brain.BrainV8, 30, (245, 290, 10), (-3.5,-2.9,10), paths, \
+    # gamma, max_discount, room_start, 'grid_search\\')
 
     # # Train the monkey
     # loss_report = train.supervised_columns(100, 300, paths, monkey_brain, \
     #     gamma, max_discount, lr_supervised, 10, \
     #     intermediate='brainsave\\intermediate.brainsave')
 
-    out_f = open('out.txt', 'a')
-    out_f.write(str(loss_report))
-    out_f.write('\n')
-    out_f.close()
-    plt.title('Supervised Training lr' + str(lr_supervised) + \
-        ' ' + str(paths)[6:22])
-    plt.xlabel('Epoch')
-    plt.ylabel('Average Loss per Data Point')
-    plt.plot(*zip(*loss_report))
-    plt.show()
+    # out_f = open('out.txt', 'a')
+    # out_f.write(str(loss_report))
+    # out_f.write('\n')
+    # out_f.close()
+    # plt.title('Supervised Training lr' + str(lr_supervised) + \
+    #     ' ' + str(paths)[6:22])
+    # plt.xlabel('Epoch')
+    # plt.ylabel('Average Loss per Data Point')
+    # plt.plot(*zip(*loss_report))
+    # plt.show()
 
-    # Save the brain
-    torch.save(monkey_brain.state_dict(), 'brainsave\\V4r_480-200-16-8-4_T0.brainsave')
+    # # Save the brain
+    # torch.save(monkey_brain.state_dict(), 'brainsave\\V4r_480-200-16-8-4_T0.brainsave')
 
-    # # Load brain from permanent memory
-    # monkey_brain.load_state_dict(torch.load('brainsave\\V4_480-200-16-8-4_T2.brainsave'))
+    # Load brain from permanent memory
+    monkey_brain.load_state_dict(torch.load('grid_search\\gamma0.8\\history_zoom\\batch332lr0.0007943279924802482.brainsave'))
 
     # monkey_brain.pi = monkey_brain.pi_greedy
     # for i in range(4000):
     #     g.tick(0, loud=[0], wait=True)
 
-    # # Model testing
-    g.monkeys[0].brain.pi = g.monkeys[0].brain.pi_greedy
-    print(train.test_model(g, 100, 30))  
-    test_results = []
-    for r in range(5):
-        test_results.append(train.test_model(g, 1000, 30))        
-        print(test_results)
-    g.monkeys[0].brain.pi = g.monkeys[0].brain.pi_epsilon_greedy
-    exit()
+    # # # Model testing
+    # g.monkeys[0].brain.pi = g.monkeys[0].brain.pi_greedy
+    # print(train.test_model(g, 100, 30))  
+    # test_results = []
+    # for r in range(5):
+    #     test_results.append(train.test_model(g, 1000, 30))        
+    #     print(test_results)
+    # g.monkeys[0].brain.pi = g.monkeys[0].brain.pi_epsilon_greedy
+    # exit()
 
     # # Watch monkey train
     # monkey_brain.report = True
@@ -139,8 +141,12 @@ if __name__ == "__main__":
     # loss_report = train.dqn_training(g, 50000, gamma, lr_reinforcement, \
     # epsilon = epsilon, watch = False)
 
+    # Reinforcment learning
+    loss_report = train.guided_dqn(g, test_g, 20000, gamma, lr_reinforcement, \
+    AI_brain)
+
     # Save the brain
-    torch.save(monkey_brain.state_dict(), 'brainsave\\V4_480-200-16-8-4_T3.brainsave')
+    torch.save(monkey_brain.state_dict(), 'brainsave\\gridT0.brainsave')
 
     out_f = open('out.txt', 'a')
     out_f.write(str(loss_report))
@@ -153,19 +159,19 @@ if __name__ == "__main__":
     plt.plot(*zip(*loss_report))
     plt.show()
 
-    # Model testing
-    g.monkeys[0].brain.pi = g.monkeys[0].brain.pi_greedy
-    print(train.test_model(g, 100, 30))  
-    test_results = []
-    for r in range(5):
-        test_results.append(train.test_model(g, 1000, 30))        
-        print(test_results)
-    g.monkeys[0].brain.pi = g.monkeys[0].brain.pi_epsilon_greedy
-    exit()
+    # # Model testing
+    # g.monkeys[0].brain.pi = g.monkeys[0].brain.pi_greedy
+    # print(train.test_model(g, 100, 30))  
+    # test_results = []
+    # for r in range(5):
+    #     test_results.append(train.test_model(g, 1000, 30))        
+    #     print(test_results)
+    # g.monkeys[0].brain.pi = g.monkeys[0].brain.pi_epsilon_greedy
+    # exit()
 
-    train.curated_bananas_dqn(g_CR, CR_level, 20, gamma, 0, 20, \
-        block_index = CR_block_index, watch = True)
-    train.dqn_training(g, 60, gamma, 0, watch = True)
+    # train.curated_bananas_dqn(g_CR, CR_level, 20, gamma, 0, 20, \
+    #     block_index = CR_block_index, watch = True)
+    # train.dqn_training(g, 60, gamma, 0, watch = True)
 
 
     # # Build monkeys

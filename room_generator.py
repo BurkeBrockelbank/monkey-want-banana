@@ -221,8 +221,7 @@ def play_record(path):
     for x in data:
         food = x[0]
         action = x[1]
-        Q = x[2]
-        board = x[3]
+        board = x[2]
         print('food', food)
         print(channel_to_ASCII(board))
         input('>>>' + gl.WASD[action])
@@ -258,3 +257,10 @@ def png_to_channel(path, rgb_list):
                 if all(img[i,j] == rgb[layer]):
                     channels[layer, i, j] = 1
     return channels
+
+def free_spot(channel_map):
+    while 1:
+        i = np.rand(channel_map.size()[1])
+        j = np.rand(channel_map.size()[2])
+        if all(channel_map[:,i,j] == 0):
+            return i,j
