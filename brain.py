@@ -1060,6 +1060,141 @@ class BrainV8(BrainV4):
 
         return Q
 
+class BrainV9(BrainV4):
+    """
+    This implements a basic approach. There is just one hidden layer with size
+    determined by the formula,
+
+    $N_h = \frac{N_s} {(\alpha * (N_i + N_o))},$
+
+    $\alpha$ is chosen to be between 2 and 10.
+
+    This inherits from Brain4 and thus is compatible with column calculations.
+    """
+    def __init__(self):
+        """
+        Initialize the architecture of the neural net.
+        """
+        # Initialize the parent class
+        BrainV4.__init__(self)
+        # Set the default policy
+        self.pi = self.pi_epsilon_greedy
+
+        # Create fully connected layers
+        # Input is 4x11x11+1
+        self.f1 = nn.Linear(485,8)
+        self.f2 = nn.Linear(8,5)
+        self.f3 = nn.Linear(5,5)
+        # report flag
+        self.report = False
+
+    def forward(self, foods, visions):
+        """
+        Args:
+            foods: The food states (n)
+            visions: The vision states (nx4x11x11)
+        
+        Returns:
+            0: nx5 tensor of qualities.
+        """
+        # Unpack state
+        food_float = foods.float().view((-1,1))
+        vision_float = visions.float().view((foods.size()[0], -1))
+
+        # Fully connected layers
+        # First flatten and concatenate
+        h = torch.cat((food_float,vision_float), dim=1)
+        # Run through the layers
+        h = F.relu(self.f1(h))
+        h = F.relu(self.f2(h))
+        Q = self.f3(h)
+
+        if self.report:
+            print(Q)
+
+        return Q
+
+class BrainV10(BrainV8):
+    """
+    This implements a basic approach. There is just one hidden layer with size
+    determined by the formula,
+
+    $N_h = \frac{N_s} {(\alpha * (N_i + N_o))},$
+
+    $\alpha$ is chosen to be between 2 and 10.
+
+    This inherits from Brain4 and thus is compatible with column calculations.
+    """
+    def __init__(self):
+        """
+        Initialize the architecture of the neural net.
+        """
+        # Initialize the parent class
+        super(BrainV10, self).__init__()
+        # Set the default policy
+        self.pi = self.pi_epsilon_greedy
+
+        # Create fully connected layers
+        # Input is 4x11x11+1
+        self.f1 = nn.Linear(485,6)
+        self.f2 = nn.Linear(6,5)
+        # report flag
+        self.report = False
+
+class BrainV11(BrainV10):
+    """
+    This implements a basic approach. There is just one hidden layer with size
+    determined by the formula,
+
+    $N_h = \frac{N_s} {(\alpha * (N_i + N_o))},$
+
+    $\alpha$ is chosen to be between 2 and 10.
+
+    This inherits from Brain4 and thus is compatible with column calculations.
+    """
+    def __init__(self):
+        """
+        Initialize the architecture of the neural net.
+        """
+        # Initialize the parent class
+        super(BrainV11, self).__init__()
+        # Set the default policy
+        self.pi = self.pi_epsilon_greedy
+
+        # Create fully connected layers
+        # Input is 4x11x11+1
+        self.f1 = nn.Linear(485,3)
+        self.f2 = nn.Linear(3,5)
+        # report flag
+        self.report = False
+
+class BrainV12(BrainV10):
+    """
+    This implements a basic approach. There is just one hidden layer with size
+    determined by the formula,
+
+    $N_h = \frac{N_s} {(\alpha * (N_i + N_o))},$
+
+    $\alpha$ is chosen to be between 2 and 10.
+
+    This inherits from Brain4 and thus is compatible with column calculations.
+    """
+    def __init__(self):
+        """
+        Initialize the architecture of the neural net.
+        """
+        # Initialize the parent class
+        super(BrainV12, self).__init__()
+        # Set the default policy
+        self.pi = self.pi_epsilon_greedy
+
+        # Create fully connected layers
+        # Input is 4x11x11+1
+        self.f1 = nn.Linear(485,5)
+        self.f2 = nn.Linear(5,5)
+        # report flag
+        self.report = False
+
 class BrainDecisionAI(BrainDQN):
     """
     This is an antificial intelligence for moving towards bananas. It moves

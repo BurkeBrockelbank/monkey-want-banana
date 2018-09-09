@@ -27,7 +27,7 @@ class Monkey:
         self.food = self.start_food
         self.dead = False
         self.pos = (0,0)
-        self.food_per_banana = 5
+        self.food_per_banana = gl.BANANA_FOOD
         self.food_per_turn = 1
         self.brain = brain
         # Epsilon initialized to -1 guarantees that the policy will never

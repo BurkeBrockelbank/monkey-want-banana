@@ -260,7 +260,7 @@ def png_to_channel(path, rgb_list):
 
 def free_spot(channel_map):
     while 1:
-        i = np.rand(channel_map.size()[1])
-        j = np.rand(channel_map.size()[2])
+        i = random.randrange(channel_map.size()[1])
+        j = random.randrange(channel_map.size()[2])
         if all(channel_map[:,i,j] == 0):
             return i,j

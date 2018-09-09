@@ -439,3 +439,88 @@ I have changed to a reward of -10 for death. Having a such a big penalty was cau
 Just finished the initial training on the adventure room. 100 epochs of 300 batches of 132 points. Overfitting after 20 epochs. It is scoring a 20 though, not great. I am going to increase the dataset size. I think I am going to have to implement a grid search test to find hyperparameters. Learning rate is too high, batch number isn't clear, etc.
 
 So I was having a lot of trouble, then I finally decided to take a look at the training data and it was crazy. I don't know what happened. Some of it was the random room, some of it was the adventure map. I really can't say what happened. Regerating only 50000 points now.
+
+With the AI guided training, the monkey performs alright, degrading slowly, but ultimately it still degrades. I believe this is becasue the monkey was never actually trained on death and every death just kicks the NN in the nuts. We need to deal with the training data in a more realistic way (including death). Right now I am thinking maybe we should just truncate the series with a -1.31 for an average value.
+
+This helped! Training for death helped and you see after RR the monkey actually has begun to understand death. In the dataset there are less than 600 deaths in 26000 points (2%), and in RR death occurs at approximately this rate, so I am happy enough with it. What I shall do now is investigate scenarios where the loss is greater than 12. I don't understand why this is happening.
+
+Made a new map from https://www.gridsagegames.com/blog/2014/06/mapgen-cellular-automata/ https://www.gridsagegames.com/blog/gsg-content/uploads/2014/06/cogmind_map_composite.png
+
+New training where the guide is removed and the monkey explores
+
+    monkey_brain.load_state_dict(torch.load('brainsave\\batch269lr0.00036869445466436446.brainsave'))
+
+    # Reinforcment learning
+    epsilon_guide = train.epsilon_interpolation([0,25,75,100],[0,0.5,1,1])
+    epsilon_explore = train.epsilon_interpolation([0,40,80,100],[0,0,0.02,0])
+    loss_report = train.guided_dqn(g, test_g, 100000, 0.8, 0.01, \
+    AI_brain, epsilon_guide, epsilon_explore)
+
+    torch.save(monkey_brain.state_dict(), 'brainsave\\total_training.brainsave')
+
+See NotLongEnough.png. It is clear that we were premature in allowing the monkey to control itself. The monkey needs to train for a longer period of time with the guide, and transition to not being guided slower. We will try with this,
+
+    monkey_brain.load_state_dict(torch.load('brainsave\\batch269lr0.00036869445466436446.brainsave'))
+
+    # Reinforcment learning
+    epsilon_guide = train.epsilon_interpolation([0,10,20,40,80,100],[0,0,0.2,0.3,0.8,1])
+    epsilon_explore = train.epsilon_interpolation([0,40,80,100],[0,0,0.02,0])
+    loss_report = train.guided_dqn(g, test_g, 100000, 0.8, 0.01, \
+    AI_brain, epsilon_guide, epsilon_explore)
+
+    torch.save(monkey_brain.state_dict(), 'brainsave\\total_training.brainsave')
+
+See ReducingLoss.png. Clearly the loss is decreasing which is nice, but we are still making the monkey worse.
+
+Those last tests didn't work quite right because of an error with train.epsilon_interpolation. Will redo.
+
+See Phase2.png.
+
+Tests 31.265, 31.475, 30.574, 30.401, 28.889.
+AI tests 
+
+I kind of want to switch to bananas having 10 food and having less bananas around. I think I am going to do it.
+
+New data in data10 folder.
+
+===============================================================================================================================
+====================================================== THE NEW ERA ============================================================
+===============================================================================================================================
+
+Tests are now constituted of 300 trials of 50 turns. Mean(std) will be reported.
+
+Guide tests 69(37) on AdventureMapBananaLavaShrunkMediumBanana.png
+
+Guide tests 42(29) on AdventureMapBananaLavaShrunk.png
+
+Generating new data on AdventureMapBananaLavaShrunk.png in data\AdventureMapBananaLavaShrunk with 50 000 turns and a turn maximum of 100.
+
+Did a grid search with brain V8
+train.grid_search_supervised(brain.BrainV8, 30, (250, 320, 10), (-3.5,-2.5,10), paths, gamma, room_start, 'grid_search\\')
+
+The best that the model does is 23(24). I think we need to investigate new architectures that bring us closer to the range that the guide does.
+
+Brain V9 has structure
+        self.f1 = nn.Linear(485,8)
+        self.f2 = nn.Linear(8,5)
+        self.f3 = nn.Linear(5,5)
+
+Adding another layer did not improve the model whatsoever. It seems to actually make it work. I am going to try V10 where the hidden layer is made smaller than V8.
+
+BrainV10
+        self.f1 = nn.Linear(485,6)
+        self.f2 = nn.Linear(6,5)
+
+I think it's doing better. I am going to try a different brain with a tiny hidden layer.
+
+BrainV11
+        self.f1 = nn.Linear(485,3)
+        self.f2 = nn.Linear(3,5)
+
+It finally got worse. I am going to try making it a little bigger.
+
+BrainV12
+        self.f1 = nn.Linear(485,5)
+        self.f2 = nn.Linear(5,5)
+
+This is worse than V10 as well. Clearly 6 nodes in the hidden layer is the minimum.

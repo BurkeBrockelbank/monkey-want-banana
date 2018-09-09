@@ -73,6 +73,7 @@ WASD = 'wasd '
 
 # Reward
 DEATH_REWARD = -10
+BANANA_FOOD = 5
 
 # Start with the basic room
 ROOM_START_ASCII =  '##################################\n'+\

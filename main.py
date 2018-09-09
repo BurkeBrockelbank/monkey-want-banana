@@ -14,6 +14,7 @@ import torch.nn as nn
 import matplotlib.pyplot as plt
 import random
 import math
+import numpy as np
 
 import global_variables as gl
 import exceptions
@@ -22,6 +23,43 @@ import brain
 import monkey
 import grid
 import train
+
+def plot_phase_2(loss_report, save_path = None):
+    """
+    This function plots the loss report from phase 2 type training (guided dqn)
+
+    Args:
+        loss_report: Formatted as
+            [(n, loss, score, guide_epsilon, explore_epsilon), ...].
+        save_path: Default None. If a string is given, it will try to save the plot
+            to that location and not show it.
+    """
+    n, loss, test_result, test_err, guide, explore = [np.array(x) for x in zip(*loss_report)]
+
+    fig = plt.figure()
+    plt.title('Learning ' + str(lr_reinforcement))
+
+    ax1 = fig.add_subplot(111)
+    ax1.set_xlabel('Turn')
+    ax1.set_ylabel('Loss, Score')
+    score_err = ax1.fill_between(n, test_result-test_err, test_result+test_err, color='orange', alpha=0.4)
+    score_plot = ax1.plot(n, test_result, label='score', color='orange')
+    loss_plot = ax1.plot(n, loss, label='loss', color='blue')
+
+    ax2 = ax1.twinx()
+    ax2.set_ylabel('Epsilon')
+    ax2.yaxis.tick_right()
+    guide_plot = ax2.plot(n, guide, color='green', label='guide ε')
+    explore_plot = ax2.plot(n, [x*10 for x in explore], color='red', label='explore ε × 10')
+
+    plot = loss_plot + score_plot + guide_plot + explore_plot
+    labels = [l.get_label() for l in plot]
+    ax1.legend(plot, labels, loc=0)
+
+    if save_path == None:
+        plt.show()
+    else:
+        plt.savefig(save_path)
 
 def dump_parameters(brain, path):
     out_F = open(path, 'w')
@@ -50,10 +88,11 @@ if __name__ == "__main__":
 
     # Create the map
     # room_start = rg.rand_room(500, [0.03,0,0.05,0.01])
-    room_start = rg.png_to_channel('img\\AdventureMapBananaLavaShrunkMoreBananas.png', [(0,0,0), (128,64,0), (255,242,0), (237,28,36)])
+    room_start = rg.png_to_channel('img\\AdventureMapBananaLavaShrunk.png', [(0,0,0), (128,64,0), (255,242,0), (237,28,36)])
     # Create brain to train
-    monkey_brain = brain.BrainV8()
-    AI_brain = brain.BrainDecisionAI(gamma, 4, -1, gl.DEATH_REWARD, save_Q=True)
+    monkey_brain = brain.BrainV10()
+    AI_brain = brain.BrainDecisionAI(gamma, gl.BANANA_FOOD-1, -1, gl.DEATH_REWARD, save_Q=True)
+    # monkey_brain = brain.BrainDecisionAI(gamma, gl.BANANA_FOOD-1, -1, gl.DEATH_REWARD, save_Q=True) #########
     # Put brain in monkey in grid
     monkeys = [monkey.Monkey(monkey_brain)]
     test_monkeys = [monkey.Monkey(monkey_brain)]
@@ -62,11 +101,11 @@ if __name__ == "__main__":
     g = grid.Grid(monkeys, room_start)
     test_g = grid.Grid(test_monkeys, room_start.clone())
 
-    # # Make data paths for the monkey training data
-    # paths = ['data\\life'+str(i)+'.dat' for i in range(600)]
+    # Make data paths for the monkey training data
+    paths = ['data\\AdventureMapBananaLavaShrunk\\life'+str(i)+'.dat' for i in range(750)]
 
     # # Generate training data
-    # train.monkey_training_data_1_life(50000, 250, 'data\\life', g, loud = [])
+    # train.monkey_training_data_1_life(50000, 100, 'data\\AdventureMapBananaLavaShrunk\\life', g, loud = [])
     # exit()
     
 
@@ -85,9 +124,9 @@ if __name__ == "__main__":
     # loss_report = train.cross_entropy_supervised_training(8, 6, paths, \
     #     monkey_brain, lr_supervised)
 
-    # # Grid search
-    # train.grid_search_supervised(brain.BrainV8, 30, (245, 290, 10), (-3.5,-2.9,10), paths, \
-    # gamma, max_discount, room_start, 'grid_search\\')
+    # Grid search
+    train.grid_search_supervised(brain.BrainV10, 30, (100, 520, 20), (-4,-2,20), paths, \
+    gamma, room_start, 'grid_search\\')
 
     # # Train the monkey
     # loss_report = train.supervised_columns(100, 300, paths, monkey_brain, \
@@ -106,22 +145,22 @@ if __name__ == "__main__":
     # plt.show()
 
     # # Save the brain
-    # torch.save(monkey_brain.state_dict(), 'brainsave\\V4r_480-200-16-8-4_T0.brainsave')
+    # torch.save(monkey_brain.state_dict(), 'brainsave\\V4r_480-200-16-8-4_T0_no_truncate.brainsave')
 
-    # Load brain from permanent memory
-    monkey_brain.load_state_dict(torch.load('grid_search\\gamma0.8\\history_zoom\\batch332lr0.0007943279924802482.brainsave'))
+    # # Load brain from permanent memory
+    # monkey_brain.load_state_dict(torch.load('grid_search\\gamma0.8\\history_zoom\\batch332lr0.0007943279924802482.brainsave'))
+    # # Load brain from permanent memory
+    # monkey_brain.load_state_dict(torch.load('brainsave\\batch264lr0.003162277629598975.brainsave'))
+    # # Load brain from permanent memory
+    # monkey_brain.load_state_dict(torch.load('brainsave\\total_training.brainsave'))
 
     # monkey_brain.pi = monkey_brain.pi_greedy
     # for i in range(4000):
     #     g.tick(0, loud=[0], wait=True)
 
-    # # # Model testing
+    # # Model testing
     # g.monkeys[0].brain.pi = g.monkeys[0].brain.pi_greedy
-    # print(train.test_model(g, 100, 30))  
-    # test_results = []
-    # for r in range(5):
-    #     test_results.append(train.test_model(g, 1000, 30))        
-    #     print(test_results)
+    # print(train.test_model(g, 300, 50))
     # g.monkeys[0].brain.pi = g.monkeys[0].brain.pi_epsilon_greedy
     # exit()
 
@@ -141,23 +180,21 @@ if __name__ == "__main__":
     # loss_report = train.dqn_training(g, 50000, gamma, lr_reinforcement, \
     # epsilon = epsilon, watch = False)
 
-    # Reinforcment learning
-    loss_report = train.guided_dqn(g, test_g, 20000, gamma, lr_reinforcement, \
-    AI_brain)
+    # # # Reinforcment learning
+    # epsilon_guide = train.epsilon_interpolation([0,10,20,40,80,100],[0,0,0.2,0.3,0.8,1])
+    # epsilon_explore = train.epsilon_interpolation([0,40,80,100],[0,0,0.02,0])
+    # loss_report = train.guided_dqn(g, test_g, 100000, gamma, lr_reinforcement, \
+    # AI_brain, epsilon_guide, epsilon_explore)
 
-    # Save the brain
-    torch.save(monkey_brain.state_dict(), 'brainsave\\gridT0.brainsave')
+    # # Save the brain
+    # torch.save(monkey_brain.state_dict(), 'brainsave\\total_training.brainsave')
 
-    out_f = open('out.txt', 'a')
-    out_f.write(str(loss_report))
-    out_f.write('\n')
-    out_f.close()
-    plt.title('Learning ' + str(lr_reinforcement), )
-    plt.xlabel('Turn')
-    plt.ylabel('Loss')
-    # plt.ylim(0,6)
-    plt.plot(*zip(*loss_report))
-    plt.show()
+    # out_f = open('out.txt', 'a')
+    # out_f.write(str(loss_report))
+    # out_f.write('\n')
+    # out_f.close()
+
+    # plot_phase_2(loss_report)
 
     # # Model testing
     # g.monkeys[0].brain.pi = g.monkeys[0].brain.pi_greedy

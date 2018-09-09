@@ -21,11 +21,14 @@ import grid
 
 import math
 import random
+import bisect
 
 import numpy as np
 
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import axes3d
+
+import winsound
 
 class PlateauFlagger:
     """
@@ -620,7 +623,7 @@ def supervised_training(epochs, batches, paths, brain, gamma, \
 
     return loss_record
 
-def load_data_paths(paths, gamma, max_discount):
+def load_data_paths(paths, gamma, max_discount=-1):
     """
     This loads in data paths and claculates gamma for each data point with a
     truncation error defined by max_discount.
@@ -628,8 +631,8 @@ def load_data_paths(paths, gamma, max_discount):
     Args:
         paths: A list of paths leading to the data files.
         gamma: The discount factor in the Bellman equation.
-        max_discount: The maximum factor to allow for discount in calculating
-        qualities.
+        max_discount: Default -1. If specified, this defines the maximum discount
+            that is considered before the Bellman series is truncated.
     """
     all_data = []
     for path in paths:
@@ -662,8 +665,9 @@ def load_data_paths(paths, gamma, max_discount):
     # Since the final quality values concatenate the series short, we should
     # cut those data points. We will arbitrarily decide to ignore rewards which
     # have a reduction in magnitute by the factor max_discount.
-    n_to_cut = math.ceil(math.log(max_discount)/math.log(gamma))
-    all_data = [x[:-n_to_cut] for x in all_data]
+    if max_discount != -1:
+        n_to_cut = math.ceil(math.log(max_discount)/math.log(gamma))
+        all_data = [x[:-n_to_cut] for x in all_data]
     # Concatenate the data sets.
     data_set = [el for one_path in all_data for el in one_path]
 
@@ -761,7 +765,7 @@ def plot_grid_record(plot_batch, plot_lr, plot_training, plot_val, \
 
 
 def grid_search_supervised(brain_class, max_epochs, batch_range, lr_range, paths, \
-    gamma, max_discount, scoring_room, data_dir):
+    gamma, scoring_room, data_dir,  max_discount=-1):
     """
     This performs a grid search on the number of batches to have and the learning
     rate to use.
@@ -779,10 +783,10 @@ def grid_search_supervised(brain_class, max_epochs, batch_range, lr_range, paths
             class in and it will be instantiated here.
         paths: A list of paths leading to the data files.
         gamma: The discount factor in the Bellman equation.
-        max_discount: The maximum factor to allow for discount in calculating
-        qualities.
         scoring_room: The room in which to calculate the score of the monkey.
         data_dir: The directory where plots and data are saved.
+        max_discount: Default -1. If specified, this defines the maximum discount
+            that is considered before the Bellman series is truncated.
 
     Returns:
 
@@ -796,8 +800,6 @@ def grid_search_supervised(brain_class, max_epochs, batch_range, lr_range, paths
     batch_grid = torch.arange(batch_range[0], batch_range[1], batch_step, \
         dtype = torch.int).tolist()
     lr_grid = torch.logspace(*lr_range).tolist()
-    print('Batches', batch_grid)
-    print('lr', lr_grid)
 
     # Read in the data
     print('Reading data...')
@@ -813,6 +815,10 @@ def grid_search_supervised(brain_class, max_epochs, batch_range, lr_range, paths
     print('validation set:', len(validation_set))
     print('test set:', len(test_set))
     print('total:', len(data_set)+len(validation_set)+len(test_set))
+
+    print('Batches', batch_grid)
+    print('Batch sizes', [len(data_set)/x for x in batch_grid])
+    print('lr', lr_grid)
 
     # Define the loss criterion
     criterion = custom_loss.L1_clamp_loss
@@ -924,7 +930,7 @@ def grid_search_supervised(brain_class, max_epochs, batch_range, lr_range, paths
             # Calculate score
             brain.eval()
             g = grid.Grid([monkey.Monkey(brain)], scoring_room)
-            score = test_model(g, 50, 30, loud=False)
+            score, score_err = test_model(g, 50, 30, loud=False)
             brain.train()
 
             # Save the data for this grid point
@@ -1016,7 +1022,7 @@ def grid_search_supervised(brain_class, max_epochs, batch_range, lr_range, paths
 
 
 def supervised_columns(epochs, batches, paths, brain, gamma, \
-    max_discount, lr, report = True, intermediate = ''):
+    lr, max_discount=-1, report = True, intermediate = ''):
     """
     This performs supervised training on the monkey. First path is assumed to
     point to the validation set.
@@ -1026,8 +1032,8 @@ def supervised_columns(epochs, batches, paths, brain, gamma, \
         paths: A list of paths leading to the data files.
         brain: The brain to train.
         gamma: The discount factor in the Bellman equation.
-        max_discount: The maximum factor to allow for discount in calculating
-        qualities.
+        max_discount: Default -1. If otherwise specified, this defines the highest
+            discount to be considered in the series.
         lr: The learning rate to use.
         reports: The number of times to print progress.
         intermediate: The file to save intermediate brain trainings to.
@@ -1062,7 +1068,7 @@ def supervised_columns(epochs, batches, paths, brain, gamma, \
         # that can be calculated 
         new_data = data[:-1]
         # Calculate qualities
-        quals = [0]
+        quals = [-1.31]
         for food_diff in food_diffs[::-1]:
             quals.append(quals[-1]*gamma+food_diff)
         quals = quals[1:]
@@ -1075,8 +1081,9 @@ def supervised_columns(epochs, batches, paths, brain, gamma, \
     # Since the final quality values concatenate the series short, we should
     # cut those data points. We will arbitrarily decide to ignore rewards which
     # have a reduction in magnitute by the factor max_discount.
-    n_to_cut = math.ceil(math.log(max_discount)/math.log(gamma))
-    all_data = [x[:-n_to_cut] for x in all_data]
+    if max_discount != -1:
+        n_to_cut = math.ceil(math.log(max_discount)/math.log(gamma))
+        all_data = [x[:-n_to_cut] for x in all_data]
     # And now we have processed the data
 
     # Concatenate the data sets.
@@ -1416,7 +1423,33 @@ def curated_bananas_dqn(g, level, N, gamma, lr, food, random_start = False, \
 
     return loss_record
 
-def guided_dqn(g, test_g, N, gamma, lr, guide, watch=False):
+def epsilon_interpolation(x,y):
+    """
+    This function returns a function that is a linear interpolation
+    of the points given in the arguments.
+
+    Args:
+        x: The x values.
+        y: The y values.
+
+    Returns:
+        0: Function
+    """
+    def out_func(p):
+        if p > 100 or p < 0:
+            raise ValueError('Epsilon interpolation takes a percentage between 0 and 100')
+        elif p in x:
+            return y[x.index(p)]
+        else:
+            bi = bisect.bisect(x, p)-1
+            m = (y[bi+1]-y[bi])/(x[bi+1]-x[bi])
+            return y[bi] + m*(p-x[bi])
+    return out_func
+
+
+
+
+def guided_dqn(g, test_g, N, gamma, lr, guide, epsilon_guide, epsilon_explore, watch=False):
     """
     Runs the DQN algorithm but instead of using pi_greedy or pi_epsilon greedy,
     a guiding AI is used to decide on moves.
@@ -1431,6 +1464,12 @@ def guided_dqn(g, test_g, N, gamma, lr, guide, watch=False):
         lr: The learning rate.
         guide: An instance of the brain class whose pi_greedy will be
             consulted.
+        epsilon_guide: A function which converts a percentage to a value
+            in [0,1]. The result is the chance of taking a move defined by the
+            neural net.
+        epsilon_explore: A function which converts a percentage to a value in
+            [0,1]. The result is the chance of taking a move at random when the
+            neural net has been chosen to take a move.
         watch: Default False. If True, will wait for the user to look at every
             iteration of the training.
 
@@ -1479,14 +1518,22 @@ def guided_dqn(g, test_g, N, gamma, lr, guide, watch=False):
     if one_percent == 0:
         one_percent = N+1
 
+    # new_pos = None ########
+    # just_died = 0 ###########
+
     # Iterate N times
     for n in range(N):
         if n%one_percent == 0:
-            report_string = 'Learning is ' + str(n//one_percent) + '% complete.'
+            # Test the monkey
+            percentage = n//one_percent
+            report_string = 'Learning is ' + str(percentage) + '% complete.'
             test_g.monkeys[0].brain.eval()
-            test_result = test_model(test_g, 100, 30, loud=False)
-            report_string += '. Score ' + str(test_result)
+            test_result, test_err = test_model(test_g, 500, 30, loud=False)
+            report_string += '. Score ' + str(test_result) +'(' + str(test_err) + ')'
             test_g.monkeys[0].brain.train()
+            # Find the chance of the neural net making a decision
+            epsilon_value = epsilon_guide(percentage)
+            epsilon_random = epsilon_explore(percentage)
 
             print(report_string)
 
@@ -1499,45 +1546,81 @@ def guided_dqn(g, test_g, N, gamma, lr, guide, watch=False):
         p = p_new
 
         # 2) Get the consequent state (move the monkey).
+        # old_monkey_pos = g.monkeys[0].pos #############
         g.tick(1, directions = [a], invincible = True, loud=loud, wait=False)
         state_old = state_new
         sight_new = g.surroundings(g.monkeys[0].pos)
         food_new = g.monkeys[0].food
         state_new = (food_new, sight_new)
+        # old_pos = new_pos ##########
 
         # 3) Get the immediate reward.
         # Immediate reward is normally food difference.
         r = state_new[0]-state_old[0]
         # If the monkey is dead, it instead gets a large penalty
+        # just_died += 1############
         if g.monkeys[0].dead:
+            # just_died = -1############
             r = gl.DEATH_REWARD
             # If the monkey died of hunger, feed it.
             if g.monkeys[0].food < 0:
                 g.monkeys[0].eat(5)
-                state_new = (g.monkeys[0].food, sight_new)
                 # Teleport the monkey
                 i, j = rg.free_spot(g.channel_map)
                 g.teleport_monkey(g.monkeys[0].pos, (i,j))
                 g.monkeys[0].pos = (i,j)
+                # Rebuild the state
+                sight_new = g.surroundings(g.monkeys[0].pos)
+                state_new = (g.monkeys[0].food, sight_new)
             g.monkeys[0].dead = False
         total_reward += r
+
+        # new_monkey_pos = g.monkeys[0].pos ##########
 
         # 4) Calculate the loss
         # a) Calculate the quality of the move undertaken
         # This was already done in part 1.
         # b) Calculate the maximum quality of the subsequent move
-        Q_guide, a_guide, p_guide = guide.pi_greedy(state_new)
-        a_new = a_guide
-        p_new = p_guide
-        Q_new = g.monkeys[0].brain.Q(state_new, a_new)
+        if random.random() < epsilon_value:
+            Q_guide, a_guide, p_guide = guide.pi_greedy(state_new)
+            a_new = a_guide
+            p_new = p_guide
+            Q_new = g.monkeys[0].brain.Q(state_new, a_new)
+        else:
+            Q_new, a_new, p_new = \
+            g.monkeys[0].brain.pi_epsilon_greedy(state_new, epsilon_random)
+        # new_pos = (g.channel_map[1].nonzero()) ############
         # c) Calculate the loss difference
         delta = Q - r - gamma * Q_new
         # d) Calculate the loss as Huber loss.
         loss = criterion(delta, torch.zeros(1))
-        if abs(r) > 7:
-            print(state_new[0], state_old[0])
-            input()
-        loss_record.append((n,float(loss),test_result))
+        # if abs(r) > 10:
+        #     print('reward', r)
+        #     print(state_new[0], state_old[0])
+        #     input()
+        loss_record.append((n,float(loss),test_result, test_err, epsilon_value, epsilon_random))
+
+        # if loss > 12:
+        #     winsound.Beep(440, 2000)
+        #     print('Just died', just_died)
+        #     print(old_pos, '-->', new_pos, '|', old_monkey_pos, '-->', new_monkey_pos)
+        #     gen_states = (g.surroundings(old_monkey_pos), g.surroundings(new_monkey_pos))
+        #     print('food', state_old[0], '-->', state_new[0])
+        #     print(rg.channel_to_ASCII(state_old[1]))
+        #     print('------------------')
+        #     print(rg.channel_to_ASCII(state_new[1]))
+        #     print('==================')
+        #     print(rg.channel_to_ASCII(gen_states[0]))
+        #     print('------------------')
+        #     print(rg.channel_to_ASCII(gen_states[1]))
+        #     print(gl.WASD[a], 'with probability', p)
+        #     print('Q(s,', gl.WASD[a], ') = ', round(float(Q),3), sep='')
+        #     print('--> r + gamma * Q(s\',', gl.WASD[a_new], ')', sep='')
+        #     print('  = ', r, ' + ', gamma, ' * ', round(float(Q_new),3), sep='')
+        #     print('  = ', round(float(r+gamma*Q_new),3), sep='')
+        #     print('delta = ' + str(float(delta)))
+        #     input('loss = ' + str(float(loss)))
+
 
         if watch:
             print(gl.WASD[a], 'with probability', p)
@@ -1634,8 +1717,8 @@ def dqn_training(g, N, gamma, lr, \
                 '% complete. epsilon = ' + str(round(epsilon(n),3))
             g.monkeys[0].brain.eval()
             g.monkeys[0].brain.pi = g.monkeys[0].brain.pi_greedy
-            test_result = test_model(g, 100, 30, loud=False)
-            report_string += '. Score ' + str(test_result)
+            test_result, test_err = test_model(g, 100, 30, loud=False)
+            report_string += '. Score ' + str(test_result) +'('+str(test_err)+')'
             if epsilon_needed:
                 g.monkeys[0].brain.pi = g.monkeys[0].brain.pi_epsilon_greedy
             g.monkeys[0].brain.train()
@@ -1785,7 +1868,7 @@ def test_model(g, N, reset, loud=True):
         monkey.brain.eval()
 
     # Initialize score.
-    total_score = 0
+    score_record = []
 
     # Iterate over resets.
     for n in range(N):
@@ -1827,6 +1910,10 @@ def test_model(g, N, reset, loud=True):
         g.monkeys[0].age = 0
 
         # Add to score
-        total_score += g.monkeys[0].food
+        score_record.append(g.monkeys[0].food)
 
-    return total_score/N
+    score_record = torch.FloatTensor(score_record)
+    average_score = score_record.mean().item()
+    std = score_record.std().item()
+
+    return average_score, std
