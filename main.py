@@ -124,9 +124,9 @@ if __name__ == "__main__":
     # loss_report = train.cross_entropy_supervised_training(8, 6, paths, \
     #     monkey_brain, lr_supervised)
 
-    # Grid search
-    train.grid_search_supervised(brain.BrainV10, 30, (100, 520, 20), (-4,-2,20), paths, \
-    gamma, room_start, 'grid_search\\')
+    # # Grid search
+    # train.grid_search_supervised(brain.BrainV10, 30, (100, 520, 20), (-4,-2,20), paths, \
+    # gamma, room_start, 'grid_search\\')
 
     # # Train the monkey
     # loss_report = train.supervised_columns(100, 300, paths, monkey_brain, \
@@ -185,6 +185,13 @@ if __name__ == "__main__":
     # epsilon_explore = train.epsilon_interpolation([0,40,80,100],[0,0,0.02,0])
     # loss_report = train.guided_dqn(g, test_g, 100000, gamma, lr_reinforcement, \
     # AI_brain, epsilon_guide, epsilon_explore)
+
+    # Guided DQN search
+    monkey_brain.load_state_dict(torch.load('brainsave\\batch205lr0.0029763521160930395.brainsave'))
+    total_training_data, percentage_list, epsilon_guide_history, epsilon_explore_history = \
+        guide_search(g, test_g, gamma, lr_reinforcement, AI_brain, \
+        [0,0.1,0.2,0.35,0.5, 0.65,0.8,0.9,1], [0,0.01,0.03,0.06], \
+        10, 10000, 'guide_search')
 
     # # Save the brain
     # torch.save(monkey_brain.state_dict(), 'brainsave\\total_training.brainsave')

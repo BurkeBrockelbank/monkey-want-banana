@@ -30,6 +30,8 @@ from mpl_toolkits.mplot3d import axes3d
 
 import winsound
 
+import itertools
+
 class PlateauFlagger:
     """
     This class keeps track of validation losses and returns a boolean
@@ -62,7 +64,6 @@ class PlateauFlagger:
         else:
             self.bad_epochs += 1
             return True
-
 
 def monkey_training_data_1_life(N, life_span, path_root, g, loud = []):
     """
@@ -127,7 +128,6 @@ def monkey_training_data_1_life(N, life_span, path_root, g, loud = []):
                     monkey.pos = (i,j)
                     # Flag for completion.
                     invalid_spot = False
-
 
 def Q_training_data(N, paths, g, loud=[]):
     """
@@ -762,8 +762,6 @@ def plot_grid_record(plot_batch, plot_lr, plot_training, plot_val, \
     plt.savefig(save_dir+'score.png')
     plt.clf()
 
-
-
 def grid_search_supervised(brain_class, max_epochs, batch_range, lr_range, paths, \
     gamma, scoring_room, data_dir,  max_discount=-1):
     """
@@ -1018,9 +1016,6 @@ def grid_search_supervised(brain_class, max_epochs, batch_range, lr_range, paths
     # plt.savefig(data_dir+'all.png')
     # plt.close()
 
-
-
-
 def supervised_columns(epochs, batches, paths, brain, gamma, \
     lr, max_discount=-1, report = True, intermediate = ''):
     """
@@ -1198,7 +1193,6 @@ def load_records(path):
         return records[0]
     else:
         return sum(records, [])
-
 
 def curated_bananas_dqn(g, level, N, gamma, lr, food, random_start = False, \
     epsilon = lambda x: 0, watch = False, block_index = 2):
@@ -1445,6 +1439,111 @@ def epsilon_interpolation(x,y):
             m = (y[bi+1]-y[bi])/(x[bi+1]-x[bi])
             return y[bi] + m*(p-x[bi])
     return out_func
+
+
+def guide_search(g, test_g, gamma, lr, guide, \
+    epsilon_guide_space, epsilon_explore_space, \
+    test_parts, N, \
+    out_path, initial_phase = 30000):
+    """
+    This function runs the quided DQN algorithm but attempts to search for the best epsilon
+    functions for training.
+
+    Starts with 30 000 (30k) points of epsilon_guide=0, epsilon_explore = 0 then tries
+    values from epsilon_guide_space and epsilon_explore_space. The rules it follows when selecting
+    is that epsilon_guide must be an increasing function of the number of iterations and end at
+    100% and epsilon_explore must end at 0%.
+
+    Args:
+        g: The grid containing a single monkey containing a brain of
+            superclass Brain_DQN.
+        test_g: The grid to test on. Make sure the of the monkey in the test grid
+            has the same instance of brain as the one in g
+        gamma: The discount for the Bellman equation.
+        lr: The learning rate.
+        guide: An instance of the brain class whose pi_greedy will be
+            consulted.
+        epsilon_guide_space: An ordered list of values in [0,1].
+        epsilon_explore_space: An ordered list of values in [0,1].
+        test_parts: The number of parts of training (where the epsilons
+            may be altered).
+        N: The number of iterations of training to do in one part.
+        out_path: The path to output graphs and data.
+        initial_phase=30000: The number of points for the inital phase of
+            training where both epsilons are zero.
+    
+    Returns:
+        0: full training data for the best path
+        1: percentage list for transition points of the epsilons
+        2: epsilon_guide values chosen
+        3: epsilon_explore values chosen
+    """
+    # Do initial training
+    initial_training = guided_dqn(g, test_g, initial_phase, gamma, lr, guide, \
+        lambda x : 0, lambda x : 0)
+    # Save the brain
+    best_brain = out_path+'\\initial.brainsave'
+    torch.save(g.monkeys[0].brain.state_dict(), best_brain)
+
+    # Build a percentage list
+    total_points = initial_phase + test_parts*N
+    width_list = [initial_phase]+[test_parts]*N
+    cumulative_width_list = itertools.accumulate(width_list)
+    percentage_list = [round(100*x/total_points) for x in cumulative_width_list]
+
+    epsilon_guide_history = [0]
+    epsilon_explore_history = [0]
+    # Do the remaining parts
+    for part_number in range(test_parts):
+        # Build a list to hold results for this part
+        part_data = []
+        # Deal with end restrictions.
+        if part_number == len(test_parts)-1
+            available_epsilon_explore_space = [0]
+            available_epsilon_guide_space = [1]
+        else:
+            available_epsilon_explore_space = epsilon_explore_space
+            available_epsilon_guide_space = [x for x in epsilon_guide_space if x >= epsilon_guide_old[-1]]
+        # Iterate through possibilities for epsilon_guide
+        for epsilon_guide_val in available_epsilon_guide_space:
+            # Generate epsilon_guide function
+            epsilon_guide = epsilon_interpolation([0,100],[epsilon_guide_history[-1],epsilon_guide_val])
+            # Iterate through possibilites for epsilon_explore
+            for epsilon_explore in range(epsilon_explore_space):
+                # Generate the epsilon_explore_function
+                epsilon_explore = epsilon_interpolation([0,100],[epsilon_explore_history[-1],epsilon_explore_val])
+                # Revert back to the previous best
+                g.monkeys[0].brain.load_state_dict(torch.load(best_brain))
+                # Train
+                training_data = guided_dqn(g, test_g, N, gamma, lr, guide, epsilon_guide, epsilon_explore)
+                # Save the brain
+                save_name = out_path+'\\p%dg%de%d' % (part_number, epsilon_guide_val*100, epsilon_explore_val*100)
+                torch.save(g.monkeys[0].brain.state_dict(), save_name+'.brainsave')
+                # Save the training data
+                out_f = open(save_name + '.txt', 'w')
+                out_f.write(str(training_data))
+                out_f.close()
+                # Compute its part score
+                scores = [x[1] for x in training_data]
+                part_score = sum(scores)
+                # Save this to part data
+                part_data.append((part_score, epsilon_guide_val, epsilon_explore_val, save_name, training_data))
+        # Find the best brain of the bunch
+        best_tuple = max(part_data)
+        # Save data
+        best_brain = best_tuple[3]+'.brainsave'
+        epsilon_guide_history.append(best_tuple[1])
+        epsilon_explore_history.append(best_tuple[2])
+        training_data_parts.append(training_data)
+
+    # Patch together the training data
+    out_f = open(out_path+'\\temporary.txt', 'w')
+    for training_data in training_data_parts:
+        out_f.write(training_data)
+    out_f.close()
+    total_training_data = load_records(out_path+'\\temporary.txt')
+
+    return total_training_data, percentage_list, epsilon_guide_history, epsilon_explore_history
 
 
 
@@ -1845,8 +1944,6 @@ def dqn_training_columns(brain, rooms, epochs, gamma, lr, \
         epsilon_needed = True
 
     # Generate the first run
-
-
 
 def test_model(g, N, reset, loud=True):
     """
