@@ -12,6 +12,7 @@ import torch
 import torch.nn as nn
 
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 import random
 import math
 import numpy as np
@@ -24,7 +25,7 @@ import monkey
 import grid
 import train
 
-def plot_phase_2(loss_report, save_path = None):
+def plot_phase_2(loss_report, epsilon_guide_space, epsilon_explore_space, save_path = None):
     """
     This function plots the loss report from phase 2 type training (guided dqn)
 
@@ -35,31 +36,78 @@ def plot_phase_2(loss_report, save_path = None):
             to that location and not show it.
     """
     n, loss, test_result, test_err, guide, explore = [np.array(x) for x in zip(*loss_report)]
-
+    fig = plt.figure(figsize=(12, 6)) 
+    gs = gridspec.GridSpec(2, 1, height_ratios=[3, 1])
     fig = plt.figure()
     plt.title('Learning ' + str(lr_reinforcement))
 
-    ax1 = fig.add_subplot(111)
-    ax1.set_xlabel('Turn')
+    ax1 = plt.subplot(gs[0])
     ax1.set_ylabel('Loss, Score')
+    average_score = np.convolve(np.ones(10)*0.1, test_result, mode='same')
     score_err = ax1.fill_between(n, test_result-test_err, test_result+test_err, color='orange', alpha=0.4)
     score_plot = ax1.plot(n, test_result, label='score', color='orange')
+    average_score_plot = ax1.plot(n, average_score, label='10-point average score', color='brown')
     loss_plot = ax1.plot(n, loss, label='loss', color='blue')
 
     ax2 = ax1.twinx()
-    ax2.set_ylabel('Epsilon')
+    ax2.set_ylabel('guide ε')
     ax2.yaxis.tick_right()
+    ax2.set_yticks(epsilon_guide_space)
     guide_plot = ax2.plot(n, guide, color='green', label='guide ε')
-    explore_plot = ax2.plot(n, [x*10 for x in explore], color='red', label='explore ε × 10')
+
+    ax3 = plt.subplot(gs[1])
+    ax3.set_ylabel('explore ε')
+    ax3.set_xlabel('Turn')
+    ax3.set_yticks(epsilon_explore_space)
+    explore_plot = ax3.plot(n, [x*10 for x in explore], color='red', label='explore ε × 10')
 
     plot = loss_plot + score_plot + guide_plot + explore_plot
     labels = [l.get_label() for l in plot]
     ax1.legend(plot, labels, loc=0)
 
+    plt.tight_layout()
+
     if save_path == None:
         plt.show()
     else:
         plt.savefig(save_path)
+
+# def plot_phase_2(loss_report, save_path = None):
+#     """
+#     This function plots the loss report from phase 2 type training (guided dqn)
+
+#     Args:
+#         loss_report: Formatted as
+#             [(n, loss, score, guide_epsilon, explore_epsilon), ...].
+#         save_path: Default None. If a string is given, it will try to save the plot
+#             to that location and not show it.
+#     """
+#     n, loss, test_result, test_err, guide, explore = [np.array(x) for x in zip(*loss_report)]
+
+#     fig = plt.figure()
+#     plt.title('Learning ' + str(lr_reinforcement))
+
+#     ax1 = fig.add_subplot(111)
+#     ax1.set_xlabel('Turn')
+#     ax1.set_ylabel('Loss, Score')
+#     score_err = ax1.fill_between(n, test_result-test_err, test_result+test_err, color='orange', alpha=0.4)
+#     score_plot = ax1.plot(n, test_result, label='score', color='orange')
+#     loss_plot = ax1.plot(n, loss, label='loss', color='blue')
+
+#     ax2 = ax1.twinx()
+#     ax2.set_ylabel('Epsilon')
+#     ax2.yaxis.tick_right()
+#     guide_plot = ax2.plot(n, guide, color='green', label='guide ε')
+#     explore_plot = ax2.plot(n, [x*10 for x in explore], color='red', label='explore ε × 10')
+
+#     plot = loss_plot + score_plot + guide_plot + explore_plot
+#     labels = [l.get_label() for l in plot]
+#     ax1.legend(plot, labels, loc=0)
+
+#     if save_path == None:
+#         plt.show()
+#     else:
+#         plt.savefig(save_path)
 
 def dump_parameters(brain, path):
     out_F = open(path, 'w')
@@ -90,7 +138,7 @@ if __name__ == "__main__":
     # room_start = rg.rand_room(500, [0.03,0,0.05,0.01])
     room_start = rg.png_to_channel('img\\AdventureMapBananaLavaShrunk.png', [(0,0,0), (128,64,0), (255,242,0), (237,28,36)])
     # Create brain to train
-    monkey_brain = brain.BrainV10()
+    monkey_brain = brain.BrainV8()
     AI_brain = brain.BrainDecisionAI(gamma, gl.BANANA_FOOD-1, -1, gl.DEATH_REWARD, save_Q=True)
     # monkey_brain = brain.BrainDecisionAI(gamma, gl.BANANA_FOOD-1, -1, gl.DEATH_REWARD, save_Q=True) #########
     # Put brain in monkey in grid
@@ -125,8 +173,9 @@ if __name__ == "__main__":
     #     monkey_brain, lr_supervised)
 
     # # Grid search
-    # train.grid_search_supervised(brain.BrainV10, 30, (100, 520, 20), (-4,-2,20), paths, \
-    # gamma, room_start, 'grid_search\\')
+    # train.grid_search_supervised(brain.BrainV8, 30, (100, 520, 20), (-4,-2,20), paths, \
+    # gamma, room_start, 'grid_search_V8\\')
+    # exit()
 
     # # Train the monkey
     # loss_report = train.supervised_columns(100, 300, paths, monkey_brain, \
@@ -149,8 +198,8 @@ if __name__ == "__main__":
 
     # # Load brain from permanent memory
     # monkey_brain.load_state_dict(torch.load('grid_search\\gamma0.8\\history_zoom\\batch332lr0.0007943279924802482.brainsave'))
-    # # Load brain from permanent memory
-    # monkey_brain.load_state_dict(torch.load('brainsave\\batch264lr0.003162277629598975.brainsave'))
+    # Load brain from permanent memory
+    # monkey_brain.load_state_dict(torch.load('brainsave\\batch226lr0.0029763521160930395.brainsave'))
     # # Load brain from permanent memory
     # monkey_brain.load_state_dict(torch.load('brainsave\\total_training.brainsave'))
 
@@ -187,11 +236,27 @@ if __name__ == "__main__":
     # AI_brain, epsilon_guide, epsilon_explore)
 
     # Guided DQN search
-    monkey_brain.load_state_dict(torch.load('brainsave\\batch205lr0.0029763521160930395.brainsave'))
+    guide_range = [0,0.1,0.2,0.35,0.5, 0.65,0.8,0.9,1]
+    explore_range = [0,0.01,0.03,0.06]
+    monkey_brain.load_state_dict(torch.load('brainsave\\batch306lr0.0006812919164076447.brainsave'))
     total_training_data, percentage_list, epsilon_guide_history, epsilon_explore_history = \
-        guide_search(g, test_g, gamma, lr_reinforcement, AI_brain, \
-        [0,0.1,0.2,0.35,0.5, 0.65,0.8,0.9,1], [0,0.01,0.03,0.06], \
-        10, 10000, 'guide_search')
+        train.guide_search(g, test_g, gamma, lr_reinforcement, AI_brain, \
+        guide_range, explore_range, \
+        12, 10000, 'guide_searh\\guide_search_V8', initial_phase=20000, testing_tuple=(300,50))
+    plot_phase_2(total_training_data, guide_range, explore_range, 'guide_search_V8\\best_plot.png')
+    out_f = open('guide_search\\report.png', 'w')
+    out_f.write('Guide range:\n')
+    out_f.write(str(guide_range)+'\n')
+    out_f.write('\nExplore range:\n')
+    out_f.write(str(explore_range)+'\n')
+    out_f.write('\nPercentages:\n')
+    out_f.write(str(percentage_list)+'\n')
+    out_f.write('\nBest epsilon_guide:\n')
+    out_f.write(str(epsilon_guide_history)+'\n')
+    out_f.write('\nBest epsilon_explore:\n')
+    out_f.write(str(epsilon_explore_history)+'\n')
+    out_f.write('\nReport:\n')
+    out_f.write(str(total_training_data))
 
     # # Save the brain
     # torch.save(monkey_brain.state_dict(), 'brainsave\\total_training.brainsave')

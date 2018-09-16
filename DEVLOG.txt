@@ -500,12 +500,16 @@ train.grid_search_supervised(brain.BrainV8, 30, (250, 320, 10), (-3.5,-2.5,10), 
 
 The best that the model does is 23(24). I think we need to investigate new architectures that bring us closer to the range that the guide does.
 
+Brain V8
+        self.f1 = nn.Linear(485,8)
+        self.f2 = nn.Linear(8,5)
+
 Brain V9 has structure
         self.f1 = nn.Linear(485,8)
         self.f2 = nn.Linear(8,5)
         self.f3 = nn.Linear(5,5)
 
-Adding another layer did not improve the model whatsoever. It seems to actually make it work. I am going to try V10 where the hidden layer is made smaller than V8.
+Adding another layer did not improve the model whatsoever. It seems to actually make it worse. I am going to try V10 where the hidden layer is made smaller than V8.
 
 BrainV10
         self.f1 = nn.Linear(485,6)
@@ -524,3 +528,20 @@ BrainV12
         self.f2 = nn.Linear(5,5)
 
 This is worse than V10 as well. Clearly 6 nodes in the hidden layer is the minimum.
+Using type BrainV10 'brainsave\\batch226lr0.0029763521160930395.brainsave' with score 22(23)
+
+I have finally finished developing the guide search which does a grid search for the hyperparameters of the second phase (epsilon_guide and epsilon_explore). We will finally determine if it is tunable or not in training. Perhaps, as well, we need to switch from AdventureMapBananaLavaShrunk.png to a map with more bananas. It is hard to say. My gut tells me that V10, although it performs equally as well as V8 in Phase I, may not have enough expressive power for adapting in Phase II and Phase III. I saved all of it in guide search V10. It is not good enough. It also seems that the training didn't go for long enough as evidenced by the sharp increase og the guide epsilon in the end.
+
+What I will do now is switch back to the V8 one.
+
+I accidentally overwrote some of the files in the latest grid search (V10). Oh well.
+
+Doing a guide search on brain V8 batch306lr0.0006812919164076447.brainsave
+
+guide_range = [0,0.1,0.2,0.35,0.5, 0.65,0.8,0.9,1]
+    explore_range = [0,0.01,0.03,0.06]
+    monkey_brain.load_state_dict(torch.load('brainsave\\batch306lr0.0006812919164076447.brainsave'))
+    total_training_data, percentage_list, epsilon_guide_history, epsilon_explore_history = \
+        train.guide_search(g, test_g, gamma, lr_reinforcement, AI_brain, \
+        guide_range, explore_range, \
+        12, 10000, 'guide_search', initial_phase=20000, testing_tuple=(300,50))

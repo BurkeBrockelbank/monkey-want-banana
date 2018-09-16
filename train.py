@@ -32,6 +32,8 @@ import winsound
 
 import itertools
 
+import progressbar
+
 class PlateauFlagger:
     """
     This class keeps track of validation losses and returns a boolean
@@ -831,7 +833,8 @@ def grid_search_supervised(brain_class, max_epochs, batch_range, lr_range, paths
     plot_score = np.zeros_like(plot_lr)
 
     print('Training nets...')
-
+    bar = progressbar.ProgressBar(max_value=len(batch_grid)*len(lr_grid), redirect_stdout=True).start()
+    grid_points_done = 0
     # Now iterate through the grid
     for batch_index, batches in enumerate(batch_grid):
         # Calculate batch data
@@ -963,6 +966,10 @@ def grid_search_supervised(brain_class, max_epochs, batch_range, lr_range, paths
 
             # Save the brain at the end of training
             torch.save(brain.state_dict(), point_path + '.brainsave')
+
+            # Update progress bar
+            grid_points_done += 1
+            bar.update(grid_points_done)
 
     print('Finishing up...')
     # Write the data for the grid search
@@ -1444,15 +1451,19 @@ def epsilon_interpolation(x,y):
 def guide_search(g, test_g, gamma, lr, guide, \
     epsilon_guide_space, epsilon_explore_space, \
     test_parts, N, \
-    out_path, initial_phase = 30000):
+    out_path, initial_phase = 10000, testing_tuple=(500,30)):
     """
     This function runs the quided DQN algorithm but attempts to search for the best epsilon
     functions for training.
 
-    Starts with 30 000 (30k) points of epsilon_guide=0, epsilon_explore = 0 then tries
-    values from epsilon_guide_space and epsilon_explore_space. The rules it follows when selecting
-    is that epsilon_guide must be an increasing function of the number of iterations and end at
-    100% and epsilon_explore must end at 0%.
+    Starts with 30 000 (30k) points of epsilon_guide=0, epsilon_explore = 0
+    then tries values from epsilon_guide_space and epsilon_explore_space. The
+    rules it follows when selecting is that epsilon_guide must be an increasing
+    function of the number of iterations and end at 100% and epsilon_explore
+    must end at 0%. Additionally, epsilon_guide has a limit on how fast it can
+    rise. It can only rise a single point in the epsilon_guide space at a time.
+    Epsilon_explore can only stay the same, increase one tick, or decrease one
+    tick.
 
     Args:
         g: The grid containing a single monkey containing a brain of
@@ -1469,18 +1480,25 @@ def guide_search(g, test_g, gamma, lr, guide, \
             may be altered).
         N: The number of iterations of training to do in one part.
         out_path: The path to output graphs and data.
-        initial_phase=30000: The number of points for the inital phase of
+        initial_phase=10000: The number of points for the inital phase of
             training where both epsilons are zero.
+        testing_tuple = (500,30): The number of resents and turn length for testing.
     
     Returns:
-        0: full training data for the best path
+        0: Training data in the form of list of tuples. Form is
+            [(n,float(loss),test_result, test_err, epsilon_value, epsilon_random),...]
         1: percentage list for transition points of the epsilons
         2: epsilon_guide values chosen
         3: epsilon_explore values chosen
     """
     # Do initial training
+    print('Initial phase ...')
     initial_training = guided_dqn(g, test_g, initial_phase, gamma, lr, guide, \
-        lambda x : 0, lambda x : 0)
+        lambda x : 0, lambda x : 0, testing_tuple=testing_tuple)
+    # Save the training data
+    out_f = open(out_path + '\\initial.txt', 'w')
+    out_f.write(str(initial_training))
+    out_f.close()
     # Save the brain
     best_brain = out_path+'\\initial.brainsave'
     torch.save(g.monkeys[0].brain.state_dict(), best_brain)
@@ -1491,6 +1509,7 @@ def guide_search(g, test_g, gamma, lr, guide, \
     cumulative_width_list = itertools.accumulate(width_list)
     percentage_list = [round(100*x/total_points) for x in cumulative_width_list]
 
+    training_data_parts = []
     epsilon_guide_history = [0]
     epsilon_explore_history = [0]
     # Do the remaining parts
@@ -1498,24 +1517,32 @@ def guide_search(g, test_g, gamma, lr, guide, \
         # Build a list to hold results for this part
         part_data = []
         # Deal with end restrictions.
-        if part_number == len(test_parts)-1
+        if part_number == test_parts-1:
             available_epsilon_explore_space = [0]
             available_epsilon_guide_space = [1]
+        # Middle parts
         else:
-            available_epsilon_explore_space = epsilon_explore_space
-            available_epsilon_guide_space = [x for x in epsilon_guide_space if x >= epsilon_guide_old[-1]]
+            # Deal with constricted rates of change.
+            epsilon_explore_index = epsilon_explore_space.index(epsilon_explore_history[-1])
+            if epsilon_explore_index == 0:
+                available_epsilon_explore_space = epsilon_explore_space[:2]
+            else:
+                available_epsilon_explore_space = epsilon_explore_space[epsilon_explore_index-1:epsilon_explore_index+2]
+            available_epsilon_guide_space = [x for x in epsilon_guide_space if x >= epsilon_guide_history[-1]][:2]
         # Iterate through possibilities for epsilon_guide
         for epsilon_guide_val in available_epsilon_guide_space:
             # Generate epsilon_guide function
             epsilon_guide = epsilon_interpolation([0,100],[epsilon_guide_history[-1],epsilon_guide_val])
             # Iterate through possibilites for epsilon_explore
-            for epsilon_explore in range(epsilon_explore_space):
+            for epsilon_explore_val in available_epsilon_explore_space:
+                # Give a report
+                print('Part', part_number, 'guide', epsilon_guide_val, 'explore', epsilon_explore_val, '...')
                 # Generate the epsilon_explore_function
                 epsilon_explore = epsilon_interpolation([0,100],[epsilon_explore_history[-1],epsilon_explore_val])
                 # Revert back to the previous best
                 g.monkeys[0].brain.load_state_dict(torch.load(best_brain))
                 # Train
-                training_data = guided_dqn(g, test_g, N, gamma, lr, guide, epsilon_guide, epsilon_explore)
+                training_data = guided_dqn(g, test_g, N, gamma, lr, guide, epsilon_guide, epsilon_explore, testing_tuple=testing_tuple)
                 # Save the brain
                 save_name = out_path+'\\p%dg%de%d' % (part_number, epsilon_guide_val*100, epsilon_explore_val*100)
                 torch.save(g.monkeys[0].brain.state_dict(), save_name+'.brainsave')
@@ -1524,31 +1551,35 @@ def guide_search(g, test_g, gamma, lr, guide, \
                 out_f.write(str(training_data))
                 out_f.close()
                 # Compute its part score
-                scores = [x[1] for x in training_data]
+                scores = [x[2] for x in training_data]
                 part_score = sum(scores)
                 # Save this to part data
                 part_data.append((part_score, epsilon_guide_val, epsilon_explore_val, save_name, training_data))
         # Find the best brain of the bunch
         best_tuple = max(part_data)
         # Save data
-        best_brain = best_tuple[3]+'.brainsave'
+        best_brain = best_tuple[3] + '.brainsave'
         epsilon_guide_history.append(best_tuple[1])
         epsilon_explore_history.append(best_tuple[2])
-        training_data_parts.append(training_data)
+        training_data_parts.append(best_tuple[4])
 
     # Patch together the training data
-    out_f = open(out_path+'\\temporary.txt', 'w')
-    for training_data in training_data_parts:
-        out_f.write(training_data)
-    out_f.close()
-    total_training_data = load_records(out_path+'\\temporary.txt')
+    total_training_data = initial_training
+    def shift_tuple(tup, shift):
+        list_tup = list(tup)
+        list_tup[0] += shift
+        return tuple(list_tup)
+    for part in training_data_parts:
+        shifted_part = [shift_tuple(x,total_training_data[-1][0]) for x in part]
+        total_training_data += shifted_part
+
 
     return total_training_data, percentage_list, epsilon_guide_history, epsilon_explore_history
 
 
 
 
-def guided_dqn(g, test_g, N, gamma, lr, guide, epsilon_guide, epsilon_explore, watch=False):
+def guided_dqn(g, test_g, N, gamma, lr, guide, epsilon_guide, epsilon_explore, watch=False, testing_tuple=(500,30), report_score=False):
     """
     Runs the DQN algorithm but instead of using pi_greedy or pi_epsilon greedy,
     a guiding AI is used to decide on moves.
@@ -1571,11 +1602,12 @@ def guided_dqn(g, test_g, N, gamma, lr, guide, epsilon_guide, epsilon_explore, w
             neural net has been chosen to take a move.
         watch: Default False. If True, will wait for the user to look at every
             iteration of the training.
+        testing_tuple = (500,30): The number of resents and turn length for testing.
+        report_score = False: If True, writes wcore above progress bar.
 
     Returns:
-        0: Training data in the form of list of tuples. First element is
-        iteration number, second number is average loss over the
-        iterations leading up to this report.
+        0: Training data in the form of list of tuples. Form is
+            [(n,float(loss),test_result, test_err, epsilon_value, epsilon_random),...]
     """
     # Set monkey's pi to pi_greedy for scorekeeping
     g.monkeys[0].brain.pi = g.monkeys[0].brain.pi_greedy
@@ -1620,6 +1652,8 @@ def guided_dqn(g, test_g, N, gamma, lr, guide, epsilon_guide, epsilon_explore, w
     # new_pos = None ########
     # just_died = 0 ###########
 
+    bar = progressbar.ProgressBar(max_value=100, redirect_stdout=True).start()
+
     # Iterate N times
     for n in range(N):
         if n%one_percent == 0:
@@ -1627,14 +1661,16 @@ def guided_dqn(g, test_g, N, gamma, lr, guide, epsilon_guide, epsilon_explore, w
             percentage = n//one_percent
             report_string = 'Learning is ' + str(percentage) + '% complete.'
             test_g.monkeys[0].brain.eval()
-            test_result, test_err = test_model(test_g, 500, 30, loud=False)
+            test_result, test_err = test_model(test_g, testing_tuple[0], testing_tuple[1], loud=False)
             report_string += '. Score ' + str(test_result) +'(' + str(test_err) + ')'
             test_g.monkeys[0].brain.train()
             # Find the chance of the neural net making a decision
             epsilon_value = epsilon_guide(percentage)
             epsilon_random = epsilon_explore(percentage)
 
-            print(report_string)
+            bar.update(percentage)
+            if report_score:
+                print(report_string)
 
         if watch:
             print('-----------------------')
@@ -1735,6 +1771,7 @@ def guided_dqn(g, test_g, N, gamma, lr, guide, epsilon_guide, epsilon_explore, w
         loss.backward(retain_graph= (n!=N-1))
         optimizer.step()
 
+    bar.finish()
     return loss_record
 
 def dqn_training(g, N, gamma, lr, \
