@@ -243,8 +243,9 @@ if __name__ == "__main__":
         train.guide_search(g, test_g, gamma, lr_reinforcement, AI_brain, \
         guide_range, explore_range, \
         12, 10000, 'guide_searh\\guide_search_V8', initial_phase=20000, testing_tuple=(300,50))
-    plot_phase_2(total_training_data, guide_range, explore_range, 'guide_search_V8\\best_plot.png')
-    out_f = open('guide_search\\report.png', 'w')
+    plot_phase_2(total_training_data, guide_range, explore_range, \
+        'guide_search\\guide_search_V8\\best_plot.png')
+    out_f = open('guide_search\\guide_search_V8\\report.png', 'w')
     out_f.write('Guide range:\n')
     out_f.write(str(guide_range)+'\n')
     out_f.write('\nExplore range:\n')

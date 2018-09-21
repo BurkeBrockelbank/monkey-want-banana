@@ -539,9 +539,9 @@ I accidentally overwrote some of the files in the latest grid search (V10). Oh w
 Doing a guide search on brain V8 batch306lr0.0006812919164076447.brainsave
 
 guide_range = [0,0.1,0.2,0.35,0.5, 0.65,0.8,0.9,1]
-    explore_range = [0,0.01,0.03,0.06]
-    monkey_brain.load_state_dict(torch.load('brainsave\\batch306lr0.0006812919164076447.brainsave'))
-    total_training_data, percentage_list, epsilon_guide_history, epsilon_explore_history = \
-        train.guide_search(g, test_g, gamma, lr_reinforcement, AI_brain, \
-        guide_range, explore_range, \
-        12, 10000, 'guide_search', initial_phase=20000, testing_tuple=(300,50))
+explore_range = [0,0.01,0.03,0.06]
+monkey_brain.load_state_dict(torch.load('brainsave\\batch306lr0.0006812919164076447.brainsave'))
+total_training_data, percentage_list, epsilon_guide_history, epsilon_explore_history = \
+    train.guide_search(g, test_g, gamma, lr_reinforcement, AI_brain, \
+    guide_range, explore_range, \
+    12, 10000, 'guide_searh\\guide_search_V8', initial_phase=20000, testing_tuple=(300,50))
