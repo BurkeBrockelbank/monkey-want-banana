@@ -545,3 +545,77 @@ total_training_data, percentage_list, epsilon_guide_history, epsilon_explore_his
     train.guide_search(g, test_g, gamma, lr_reinforcement, AI_brain, \
     guide_range, explore_range, \
     12, 10000, 'guide_searh\\guide_search_V8', initial_phase=20000, testing_tuple=(300,50))
+
+The monkey didn't really do that much better in terms of score, but in terms of loss we are seeing some improvement. We should try an overfit one.
+
+Brain V13
+        self.f1 = nn.Linear(485,8)
+        self.f2 = nn.Linear(8,5)
+
+Running a grid search on 'maps\\AdventureMapBananaLavaShrunk.png'
+    DEATH_REWARD = -10
+    BANANA_FOOD = 5
+    paths = ['data\\AdventureMapBananaLavaShrunk\\life'+str(i)+'.dat' for i in range(750)].
+    train.grid_search_supervised(brain.BrainV8, 30, (100, 520, 20), (-4,-2,20), paths, \
+    gamma, room_start, 'grid_search\\V13\\')
+
+Doing a guide search.
+    guide_range = [0,0.1,0.2,0.35,0.5, 0.65,0.8,0.9,1]
+    explore_range = [0,0.01,0.03,0.06]
+    monkey_brain.load_state_dict(torch.load('brainsave\\batch100lr0.009999999776482582.brainsave'))
+    total_training_data, percentage_list, epsilon_guide_history, epsilon_explore_history = \
+        train.guide_search(g, test_g, gamma, lr_reinforcement, AI_brain, \
+        guide_range, explore_range, \
+        12, 10000, 'guide_search\\guide_search_V13', initial_phase=20000, testing_tuple=(300,50))
+
+It actually is doing better! It is scoring higher and has a lower loss. I think that we are on to something! Additionally, the exploration seems to be less up and down. To reduce computational strain, I am going to override the search for the explore level. Additionally I am going to make the brain more complex yet again. I may even end up adding another layer some day.
+
+Brain V14
+        self.f1 = nn.Linear(485,16)
+        self.f2 = nn.Linear(16,5)
+
+Running a grid search on 'maps\\AdventureMapBananaLavaShrunk.png'
+    DEATH_REWARD = -10
+    BANANA_FOOD = 5
+    paths = ['data\\AdventureMapBananaLavaShrunk\\life'+str(i)+'.dat' for i in range(750)].
+    train.grid_search_supervised(brain.BrainV14, 30, (100, 520, 20), (-4,-2,20), paths, \
+    gamma, room_start, 'grid_search\\V14\\')
+
+Running a guide search on that.
+    guide_range = [0,0.1,0.2,0.35,0.5, 0.65,0.8,0.9,1]
+    explore_range = [0,0.01,0.03,0.06]
+    explore_override = [0,0,0.01,0.02,0.03,0.04,0.05,0.04,0.05,0.02,0.01,0]
+    monkey_brain.load_state_dict(torch.load('brainsave\\batch100lr0.0004281332076061517.brainsave'))
+    total_training_data, percentage_list, epsilon_guide_history, epsilon_explore_history = \
+        train.guide_search(g, test_g, gamma, lr_reinforcement, AI_brain, \
+        guide_range, explore_range, \
+        12, 10000, 'guide_search\\guide_search_V14', initial_phase=20000, testing_tuple=(300,50), \
+        override_explore = explore_override)
+
+It seems almost like it was cut short. Encouragingly the loss is still getting better.
+
+Well, it's not good enough until we overdo it. Let's make a more complicated brain.
+
+Brain V15
+        self.f1 = nn.Linear(485,25)
+        self.f2 = nn.Linear(25,5)
+
+Running a grid search on 'maps\\AdventureMapBananaLavaShrunk.png'
+    DEATH_REWARD = -10
+    BANANA_FOOD = 5
+    paths = ['data\\AdventureMapBananaLavaShrunk\\life'+str(i)+'.dat' for i in range(750)].
+    train.grid_search_supervised(brain.BrainV15, 30, (100, 520, 20), (-4,-2,20), paths, \
+    gamma, room_start, 'grid_search\\V15\\')
+
+Running a guide search.
+    guide_range = [0,0.1,0.2,0.35,0.5, 0.65,0.8,0.9,1]
+    explore_range = [0,0.01,0.03,0.06]
+    explore_override = [0,0,0.01,0.02,0.03,0.04,0.04,0.04,0.03,0.02,0.01,0]
+    monkey_brain.load_state_dict(torch.load('brainsave\\batch499lr0.0004281332076061517.brainsave'))
+    total_training_data, percentage_list, epsilon_guide_history, epsilon_explore_history = \
+        train.guide_search(g, test_g, gamma, lr_reinforcement, AI_brain, \
+        guide_range, explore_range, \
+        12, 10000, 'guide_search\\guide_search_V15', initial_phase=20000, testing_tuple=(300,50), \
+        override_explore = explore_override)
+
+Well it didn't do as well score wise or loss wise as other brains, but what I find most interesting about this brain is that its loss value is decreasing steadily as opposed to other brains where it is a little sporadic. Additionally, it didn't seem to be done training. If I just run the Phase 2 training for a longer time I think it will not be so good because it will take a very long time. However if you take a look at the code, allowing exploration only really doubles the amount of computation which isn't that big of a deal I think. I am going to try bumping the V15 test up to Phase 3 for a couple days to see what happens.

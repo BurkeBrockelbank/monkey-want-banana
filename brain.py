@@ -1195,6 +1195,87 @@ class BrainV12(BrainV10):
         # report flag
         self.report = False
 
+class BrainV13(BrainV8):
+    """
+    This implements a basic approach. There is just one hidden layer with size
+    determined by the formula,
+
+    $N_h = \frac{N_s} {(\alpha * (N_i + N_o))},$
+
+    $\alpha$ is chosen to be between 2 and 10.
+
+    This inherits from Brain4 and thus is compatible with column calculations.
+    """
+    def __init__(self):
+        """
+        Initialize the architecture of the neural net.
+        """
+        # Initialize the parent class
+        super(BrainV13, self).__init__()
+        # Set the default policy
+        self.pi = self.pi_epsilon_greedy
+
+        # Create fully connected layers
+        # Input is 4x11x11+1
+        self.f1 = nn.Linear(485,12)
+        self.f2 = nn.Linear(12,5)
+        # report flag
+        self.report = False
+
+class BrainV14(BrainV8):
+    """
+    This implements a basic approach. There is just one hidden layer with size
+    determined by the formula,
+
+    $N_h = \frac{N_s} {(\alpha * (N_i + N_o))},$
+
+    $\alpha$ is chosen to be between 2 and 10.
+
+    This inherits from Brain4 and thus is compatible with column calculations.
+    """
+    def __init__(self):
+        """
+        Initialize the architecture of the neural net.
+        """
+        # Initialize the parent class
+        super(BrainV14, self).__init__()
+        # Set the default policy
+        self.pi = self.pi_epsilon_greedy
+
+        # Create fully connected layers
+        # Input is 4x11x11+1
+        self.f1 = nn.Linear(485,16)
+        self.f2 = nn.Linear(16,5)
+        # report flag
+        self.report = False
+
+class BrainV15(BrainV8):
+    """
+    This implements a basic approach. There is just one hidden layer with size
+    determined by the formula,
+
+    $N_h = \frac{N_s} {(\alpha * (N_i + N_o))},$
+
+    $\alpha$ is chosen to be between 2 and 10.
+
+    This inherits from Brain4 and thus is compatible with column calculations.
+    """
+    def __init__(self):
+        """
+        Initialize the architecture of the neural net.
+        """
+        # Initialize the parent class
+        super(BrainV15, self).__init__()
+        # Set the default policy
+        self.pi = self.pi_epsilon_greedy
+
+        # Create fully connected layers
+        # Input is 4x11x11+1
+        self.f1 = nn.Linear(485,25)
+        self.f2 = nn.Linear(25,5)
+        # report flag
+        self.report = False
+
 class BrainDecisionAI(BrainDQN):
     """
     This is an antificial intelligence for moving towards bananas. It moves

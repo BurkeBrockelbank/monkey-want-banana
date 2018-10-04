@@ -59,7 +59,7 @@ def plot_phase_2(loss_report, epsilon_guide_space, epsilon_explore_space, save_p
     ax3.set_ylabel('explore ε')
     ax3.set_xlabel('Turn')
     ax3.set_yticks(epsilon_explore_space)
-    explore_plot = ax3.plot(n, [x*10 for x in explore], color='red', label='explore ε × 10')
+    explore_plot = ax3.plot(n, [x for x in explore], color='red', label='explore ε')
 
     plot = loss_plot + score_plot + guide_plot + explore_plot
     labels = [l.get_label() for l in plot]
@@ -136,9 +136,9 @@ if __name__ == "__main__":
 
     # Create the map
     # room_start = rg.rand_room(500, [0.03,0,0.05,0.01])
-    room_start = rg.png_to_channel('img\\AdventureMapBananaLavaShrunk.png', [(0,0,0), (128,64,0), (255,242,0), (237,28,36)])
+    room_start = rg.png_to_channel('maps\\AdventureMapBananaLavaShrunk.png', [(0,0,0), (128,64,0), (255,242,0), (237,28,36)])
     # Create brain to train
-    monkey_brain = brain.BrainV8()
+    monkey_brain = brain.BrainV15()
     AI_brain = brain.BrainDecisionAI(gamma, gl.BANANA_FOOD-1, -1, gl.DEATH_REWARD, save_Q=True)
     # monkey_brain = brain.BrainDecisionAI(gamma, gl.BANANA_FOOD-1, -1, gl.DEATH_REWARD, save_Q=True) #########
     # Put brain in monkey in grid
@@ -173,8 +173,8 @@ if __name__ == "__main__":
     #     monkey_brain, lr_supervised)
 
     # # Grid search
-    # train.grid_search_supervised(brain.BrainV8, 30, (100, 520, 20), (-4,-2,20), paths, \
-    # gamma, room_start, 'grid_search_V8\\')
+    # train.grid_search_supervised(brain.BrainV15, 30, (100, 520, 20), (-4,-2,20), paths, \
+    # gamma, room_start, 'grid_search\\V15\\')
     # exit()
 
     # # Train the monkey
@@ -238,14 +238,16 @@ if __name__ == "__main__":
     # Guided DQN search
     guide_range = [0,0.1,0.2,0.35,0.5, 0.65,0.8,0.9,1]
     explore_range = [0,0.01,0.03,0.06]
-    monkey_brain.load_state_dict(torch.load('brainsave\\batch306lr0.0006812919164076447.brainsave'))
+    explore_override = [0,0,0.01,0.02,0.03,0.04,0.04,0.04,0.03,0.02,0.01,0]
+    monkey_brain.load_state_dict(torch.load('brainsave\\batch499lr0.0004281332076061517.brainsave'))
     total_training_data, percentage_list, epsilon_guide_history, epsilon_explore_history = \
         train.guide_search(g, test_g, gamma, lr_reinforcement, AI_brain, \
         guide_range, explore_range, \
-        12, 10000, 'guide_searh\\guide_search_V8', initial_phase=20000, testing_tuple=(300,50))
+        12, 10000, 'guide_search\\guide_search_V15', initial_phase=20000, testing_tuple=(300,50), \
+        override_explore = explore_override)
     plot_phase_2(total_training_data, guide_range, explore_range, \
-        'guide_search\\guide_search_V8\\best_plot.png')
-    out_f = open('guide_search\\guide_search_V8\\report.png', 'w')
+        'guide_search\\guide_search_V15\\best_plot.png')
+    out_f = open('guide_search\\guide_search_V15\\report.txt', 'w')
     out_f.write('Guide range:\n')
     out_f.write(str(guide_range)+'\n')
     out_f.write('\nExplore range:\n')

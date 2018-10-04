@@ -1451,7 +1451,7 @@ def epsilon_interpolation(x,y):
 def guide_search(g, test_g, gamma, lr, guide, \
     epsilon_guide_space, epsilon_explore_space, \
     test_parts, N, \
-    out_path, initial_phase = 10000, testing_tuple=(500,30)):
+    out_path, initial_phase = 10000, testing_tuple=(500,30), override_explore = None):
     """
     This function runs the quided DQN algorithm but attempts to search for the best epsilon
     functions for training.
@@ -1523,11 +1523,14 @@ def guide_search(g, test_g, gamma, lr, guide, \
         # Middle parts
         else:
             # Deal with constricted rates of change.
-            epsilon_explore_index = epsilon_explore_space.index(epsilon_explore_history[-1])
-            if epsilon_explore_index == 0:
-                available_epsilon_explore_space = epsilon_explore_space[:2]
+            if override_explore != None:
+                available_epsilon_explore_space = [override_explore[part_number]]
             else:
-                available_epsilon_explore_space = epsilon_explore_space[epsilon_explore_index-1:epsilon_explore_index+2]
+                epsilon_explore_index = epsilon_explore_space.index(epsilon_explore_history[-1])
+                if epsilon_explore_index == 0:
+                    available_epsilon_explore_space = epsilon_explore_space[:2]
+                else:
+                    available_epsilon_explore_space = epsilon_explore_space[epsilon_explore_index-1:epsilon_explore_index+2]
             available_epsilon_guide_space = [x for x in epsilon_guide_space if x >= epsilon_guide_history[-1]][:2]
         # Iterate through possibilities for epsilon_guide
         for epsilon_guide_val in available_epsilon_guide_space:
