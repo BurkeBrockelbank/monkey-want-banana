@@ -1276,6 +1276,61 @@ class BrainV15(BrainV8):
         # report flag
         self.report = False
 
+class BrainV16(BrainV8):
+    """
+    This implements a basic approach. There is just one hidden layer with size
+    determined by the formula,
+
+    $N_h = \frac{N_s} {(\alpha * (N_i + N_o))},$
+
+    $\alpha$ is chosen to be between 2 and 10.
+
+    This inherits from Brain4 and thus is compatible with column calculations.
+    """
+    def __init__(self):
+        """
+        Initialize the architecture of the neural net.
+        """
+        # Initialize the parent class
+        super(BrainV16, self).__init__()
+        # Set the default policy
+        self.pi = self.pi_epsilon_greedy
+
+        # Create fully connected layers
+        # Input is 4x11x11+1
+        self.f1 = nn.Linear(485,50)
+        self.f2 = nn.Linear(50,5)
+        # report flag
+        self.report = False
+
+class BrainV17(BrainV9):
+    """
+    This implements a basic approach. There is just one hidden layer with size
+    determined by the formula,
+
+    $N_h = \frac{N_s} {(\alpha * (N_i + N_o))},$
+
+    $\alpha$ is chosen to be between 2 and 10.
+
+    This inherits from Brain4 and thus is compatible with column calculations.
+    """
+    def __init__(self):
+        """
+        Initialize the architecture of the neural net.
+        """
+        # Initialize the parent class
+        BrainV4.__init__(self)
+        # Set the default policy
+        self.pi = self.pi_epsilon_greedy
+
+        # Create fully connected layers
+        # Input is 4x11x11+1
+        self.f1 = nn.Linear(485,50)
+        self.f2 = nn.Linear(50,8)
+        self.f3 = nn.Linear(8,5)
+        # report flag
+        self.report = False
+
 class BrainDecisionAI(BrainDQN):
     """
     This is an antificial intelligence for moving towards bananas. It moves

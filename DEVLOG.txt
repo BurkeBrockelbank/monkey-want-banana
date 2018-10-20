@@ -619,3 +619,94 @@ Running a guide search.
         override_explore = explore_override)
 
 Well it didn't do as well score wise or loss wise as other brains, but what I find most interesting about this brain is that its loss value is decreasing steadily as opposed to other brains where it is a little sporadic. Additionally, it didn't seem to be done training. If I just run the Phase 2 training for a longer time I think it will not be so good because it will take a very long time. However if you take a look at the code, allowing exploration only really doubles the amount of computation which isn't that big of a deal I think. I am going to try bumping the V15 test up to Phase 3 for a couple days to see what happens.
+
+So I ran a short Phase 3 (50000 points) just to see what happened. It was encouraging that the score did not decrease, so the neural net has become stable.
+
+I ran it for 500 000 points and we start to see a definite improvement! I am goint to run it for 5 000 000 points!.
+
+train.unguided_dqn(g, test_g, 5000000, gamma, lr_reinforcement, \
+            testing_tuple = (300, 50), epsilon_explore = lambda x: 0.03)
+
+So it seems the performance of the net plateaued right around the end of the first test (with 50 000 points). Say 60 00 is where it plateaued with a score in the high 20s. I will try doingit again with less exploration and more exploration (50000 points).
+
+So I did the one with less exploration,
+        phase_3_data = train.unguided_dqn(g, test_g, 5000000, gamma, lr_reinforcement, \
+            testing_tuple = (300, 50), epsilon_explore = lambda x: 0.01)
+I was a little surprised to see that it did a little better! It increased slower but it ended up higher. I should try a decaying value. Maybe something starting at 0.03 and decreasing to 0 by the end of things. What concerns me a bit is that the loss remains high, so the monkey really isn't understanding death.
+
+
+    if phase == 3:
+        filename = 'Phase_3_V15'
+        monkey_brain.load_state_dict(torch.load('brainsave\\Phase_2_V15.brainsave'))
+        phase_3_data = train.unguided_dqn(g, test_g, 5000000, gamma, lr_reinforcement, \
+            testing_tuple = (100, 50), epsilon_explore = lambda x: 0.3 * np.exp(-4 * x))
+        torch.save(monkey_brain.state_dict(), 'brainsave\\%s.brainsave' % (filename,))
+        plot_phase_3(phase_3_data, save_path = 'img\\%s.png' % (filename,))
+        with open('Phase_3_Data\\%s.txt' % (filename,), 'w') as out_f:
+            out_f.write(str(phase_3_data))
+        exit()
+
+I have started keeping track of averages over a greater number of trials. It gives a more realistic plot of loss. I should also probably move to the medium banana map.
+
+############## A BIG CHANGE ################
+I have started showing some averaged values of loss and score (averaged over some number of iterations.) I think it makes sense to restart training starting from phase 2 (I am happy with phase 1).
+
+I will try again with both V8 and V15
+
+        folder = 'Phase_2_Data\\V15'
+        guide_range = [0,0.1,0.2,0.35,0.5, 0.65,0.8,0.9,1]
+        explore_range = [0,0.01,0.03,0.06]
+        explore_override = [0.00, 0.01, 0.01, 0.02, 0.02, 0.03, 0.03, 0.03, 0.04, 0.04, 0.04, 0.04, 0.03, 0.03, 0.03, 0.02, 0.02, 0.01, 0.01, 0.00]
+        monkey_brain.load_state_dict(torch.load('brainsave\\batch499lr0.0004281332076061517.brainsave'))
+        total_training_data, percentage_list, epsilon_guide_history, epsilon_explore_history = \
+            train.guide_search(g, test_g, gamma, lr_reinforcement, AI_brain, \
+            guide_range, explore_range, \
+            10, 5000, folder, initial_phase=10000, testing_tuple=(50,50), \
+            override_explore = explore_override, number_of_tests = 20)
+
+        folder = 'Phase_2_Data\\V8'
+        guide_range = [0,0.1,0.2,0.35,0.5, 0.65,0.8,0.9,1]
+        explore_range = [0,0.01,0.03,0.06]
+        explore_override = [0,0,0.01,0.02,0.03,0.04,0.04,0.04,0.03,0.02,0.01,0]
+        monkey_brain.load_state_dict(torch.load('brainsave\\batch264lr0.003162277629598975.brainsave'))
+        total_training_data, percentage_list, epsilon_guide_history, epsilon_explore_history = \
+            train.guide_search(g, test_g, gamma, lr_reinforcement, AI_brain, \
+            guide_range, explore_range, \
+            10, 5000, folder, initial_phase=10000, testing_tuple=(50,50), \
+            override_explore = explore_override, number_of_tests = 20)
+
+Interestingly, both brains started with a similar level of performance, but with BrainV15 (the one with more hidden nodes) the neural net ends up getting better whereas with V8 it gets worse as the neural net makes more of its own decisions. Clearly it takes more complexity in brain architecture to learn from reinforcement learning. I daresay that we may even benefit from having more hidden neurons.
+
+So I tried re-running phase 2 on V15 and I see it relax down exactly to where it started, just like V8. Maybe more hidden nodes isn't better.
+
+Phase 3 definitely improves it on a reduced size for V15. I need to try on a large training size for both.
+
+The phase 3 data pretty conclusively shows that V15 is better. I will try by increasing training time by a factor of 10.
+
+It seems that one million points is clearly enough. I may also change the exploration function from 0.03 * np.exp(-4 * x) to 0.04 * np.exp(-3 * x)
+
+I am introducing a new brain.
+
+Brain V16
+        self.f1 = nn.Linear(485,50)
+        self.f2 = nn.Linear(50,5)
+
+I ran it through phases 1, 2, and 3 and it does quite well. It did better in phase 2 than the others but about the same in phase 3 as V15. I need to run phase 3 longer for all of them. The averaging makes that clear now. I will go 10 times longer.
+
+I ran one 10 times longer and it seems 3 times longer is perfectly sufficient. I think the main issue currently is in phase 1. The net should be doing as well as the guide after phase 1. Definitely not a factor of 2 worse. I need to rethink it. The slope of the loss shouldn't matter because the learning rate is also a factor in that. Perhaps the issue is that the unchosen options aren incentivised to be lower than the chosen option. We may have better luck if we make the lower side of the clamp have a slight slope away from the maximum value.
+
+I have finished writing that function. I will have to run a brain on it. Perhaps V15 first to see how it does.
+
+HOLD ON A SECOND! I just remembered, the scores for phase 1 were all calculated on the old (50, 30) training tuple, so they are incorrect! I need to run them all again with the L1 clamp loss (non leaking).
+
+class BrainV17(BrainV9):
+        self.f1 = nn.Linear(485,50)
+        self.f2 = nn.Linear(50,8)
+        self.f3 = nn.Linear(8,5)
+
+
+This is going in /Phase_1_Data/
+
+Interestingly, V16 and V17 are about evenly tied for being the best (score 32). I think I will try running phase 2 on both of them.
+V17_batch130lr0.005994840990751982.brainsave
+V16_batch190lr0.002154435496777296.brainsave
