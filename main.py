@@ -132,7 +132,7 @@ def dump_parameters(brain, path):
 
 if __name__ == "__main__":
     # Some constants we will be using
-    phase = 2
+    phase = 3
     gamma = 0.8
     lr_supervised = 0.001
     lr_reinforcement = 0.001
