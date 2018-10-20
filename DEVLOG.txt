@@ -710,3 +710,5 @@ This is going in /Phase_1_Data/
 Interestingly, V16 and V17 are about evenly tied for being the best (score 32). I think I will try running phase 2 on both of them.
 V17_batch130lr0.005994840990751982.brainsave
 V16_batch190lr0.002154435496777296.brainsave
+
+It's great! V17 did a much better job in Phase 2. Now onto phase 3.
