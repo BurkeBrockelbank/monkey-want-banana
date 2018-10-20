@@ -155,7 +155,7 @@ if __name__ == "__main__":
     # room_start = rg.rand_room(500, [0.03,0,0.05,0.01])
     room_start = rg.png_to_channel('maps\\AdventureMapBananaLavaShrunk.png', [(0,0,0), (128,64,0), (255,242,0), (237,28,36)])
     # Create brain to train
-    monkey_brain = brain.BrainV16()
+    monkey_brain = brain.BrainV17()
     AI_brain = brain.BrainDecisionAI(gamma, gl.BANANA_FOOD-1, -1, gl.DEATH_REWARD, save_Q=True)
     # monkey_brain = brain.BrainDecisionAI(gamma, gl.BANANA_FOOD-1, -1, gl.DEATH_REWARD, save_Q=True) #########
     # Put brain in monkey in grid
