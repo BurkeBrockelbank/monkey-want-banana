@@ -1060,7 +1060,7 @@ class BrainV8(BrainV4):
 
         return Q
 
-class BrainV9(BrainV4):
+class BrainV9(BrainDQNColumns):
     """
     This implements a basic approach. There is just one hidden layer with size
     determined by the formula,
@@ -1069,14 +1069,14 @@ class BrainV9(BrainV4):
 
     $\alpha$ is chosen to be between 2 and 10.
 
-    This inherits from Brain4 and thus is compatible with column calculations.
+    This inherits from BrainDQNColumns and thus is compatible with column calculations.
     """
     def __init__(self):
         """
         Initialize the architecture of the neural net.
         """
         # Initialize the parent class
-        BrainV4.__init__(self)
+        super(BrainV9, self).__init__()
         # Set the default policy
         self.pi = self.pi_epsilon_greedy
 
@@ -1319,7 +1319,7 @@ class BrainV17(BrainV9):
         Initialize the architecture of the neural net.
         """
         # Initialize the parent class
-        BrainV4.__init__(self)
+        BrainV4.__init__()
         # Set the default policy
         self.pi = self.pi_epsilon_greedy
 
@@ -1328,6 +1328,62 @@ class BrainV17(BrainV9):
         self.f1 = nn.Linear(485,50)
         self.f2 = nn.Linear(50,8)
         self.f3 = nn.Linear(8,5)
+        # report flag
+        self.report = False
+
+class BrainV18(BrainV9):
+    """
+    This implements a basic approach. There is just one hidden layer with size
+    determined by the formula,
+
+    $N_h = \frac{N_s} {(\alpha * (N_i + N_o))},$
+
+    $\alpha$ is chosen to be between 2 and 10.
+
+    This inherits from Brain9 and thus is compatible with column calculations.
+    """
+    def __init__(self):
+        """
+        Initialize the architecture of the neural net.
+        """
+        # Initialize the parent class
+        super(BrainV18, self).__init__()
+        # Set the default policy
+        self.pi = self.pi_epsilon_greedy
+
+        # Create fully connected layers
+        # Input is 4x11x11+1
+        self.f1 = nn.Linear(485,50)
+        self.f2 = nn.Linear(50,8)
+        self.f3 = nn.Linear(8,5)
+        # report flag
+        self.report = False
+
+class BrainV19(BrainV9):
+    """
+    This implements a basic approach. There is just one hidden layer with size
+    determined by the formula,
+
+    $N_h = \frac{N_s} {(\alpha * (N_i + N_o))},$
+
+    $\alpha$ is chosen to be between 2 and 10.
+
+    This inherits from Brain9 and thus is compatible with column calculations.
+    """
+    def __init__(self):
+        """
+        Initialize the architecture of the neural net.
+        """
+        # Initialize the parent class
+        super(BrainV19, self).__init__(self)
+        # Set the default policy
+        self.pi = self.pi_epsilon_greedy
+
+        # Create fully connected layers
+        # Input is 4x11x11+1
+        self.f1 = nn.Linear(485,50)
+        self.f2 = nn.Linear(50,20)
+        self.f3 = nn.Linear(20,5)
         # report flag
         self.report = False
 

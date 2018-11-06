@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import random
 import math
+import progressbar
 import numpy as np
 
 import global_variables as gl
@@ -24,6 +25,7 @@ import brain
 import monkey
 import grid
 import train
+import custom_loss
 
 def plot_phase_2(loss_report, epsilon_guide_space, epsilon_explore_space, save_path = None, average_iters = 20):
     """
@@ -132,7 +134,7 @@ def dump_parameters(brain, path):
 
 if __name__ == "__main__":
     # Some constants we will be using
-    phase = 3
+    phase = 2
     gamma = 0.8
     lr_supervised = 0.001
     lr_reinforcement = 0.001
@@ -155,7 +157,7 @@ if __name__ == "__main__":
     # room_start = rg.rand_room(500, [0.03,0,0.05,0.01])
     room_start = rg.png_to_channel('maps\\AdventureMapBananaLavaShrunk.png', [(0,0,0), (128,64,0), (255,242,0), (237,28,36)])
     # Create brain to train
-    monkey_brain = brain.BrainV17()
+    monkey_brain = brain.BrainV16()
     AI_brain = brain.BrainDecisionAI(gamma, gl.BANANA_FOOD-1, -1, gl.DEATH_REWARD, save_Q=True)
     # monkey_brain = brain.BrainDecisionAI(gamma, gl.BANANA_FOOD-1, -1, gl.DEATH_REWARD, save_Q=True) #########
     # Put brain in monkey in grid
@@ -178,12 +180,28 @@ if __name__ == "__main__":
 
     # train.clean_data(paths, [s.replace('.txt', 'CLEAN.txt') for s in paths])
 
+    ######### PHASE 0 (TESTING) ############
+    if phase == 0:
+        tests = []
+        test_reps = 90
+        bar = progressbar.ProgressBar(max_value=test_reps, redirect_stdout=True).start()
+        for i in range(test_reps):
+            tests.append(train.test_model(g, 50, 50, loud=False))
+            bar.update(i)
+        bar.finish()
+        with open('test.txt', 'a') as out_f:
+            for score, std in tests:
+                out_f.write('%6d     %6d\n' % (score, std))
+
+
+
     ######## PHASE 1 #############
     if phase == 1:
         print('PHASE 1: Copying')
         # Grid search
-        train.grid_search_supervised(brain.BrainV17, 30, (100, 400, 10), (-4,-2,10), paths, \
-        gamma, room_start, 'Phase_1_Data\\V17\\', score_tuple = (50,50))
+        train.grid_search_supervised(brain.BrainV16, 30, (100, 400, 10), (-4,-2,10), paths, \
+        gamma, room_start, 'Phase_1_Data\\V16_leak0.01\\', score_tuple = (50,50), \
+        criterion = custom_loss.leaky_L1_clamp_loss_generator(leak=0.01))
         exit()
 
     # # Model testing
@@ -202,7 +220,7 @@ if __name__ == "__main__":
     ####### PHASE 2 ########
     if phase == 2:
         print('PHASE 2: Detachment')
-        folder = 'Phase_2_Data\\V16'
+        folder = 'Phase_2_Data\\V16_bidirectional'
         guide_range = [0,0.1,0.2,0.35,0.5, 0.65,0.8,0.9,1]
         explore_range = [0,0.01,0.03,0.06]
         explore_override = [0.00, 0.01, 0.01, 0.02, 0.02, 0.02, 0.02, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03, 0.03]
@@ -210,7 +228,7 @@ if __name__ == "__main__":
         total_training_data, percentage_list, epsilon_guide_history, epsilon_explore_history = \
             train.guide_search(g, test_g, gamma, lr_reinforcement, AI_brain, \
             guide_range, explore_range, \
-            20, 10000, folder, initial_phase=10000, testing_tuple=(50,50), \
+            20, 50000, folder, initial_phase=100000, testing_tuple=(50,50), \
             override_explore = explore_override, number_of_tests = 20)
         plot_phase_2(total_training_data, guide_range, explore_range, \
             folder + '\\best_plot.png', average_iters = 20000)
@@ -235,9 +253,10 @@ if __name__ == "__main__":
         print('PHASE 3: Solitary Improvements')
         epsilon_func = lambda x: 0.04 * np.exp(-2 * x)
         points = 3000000
-        filename = 'lr%d_e%d_%d_p%d' % (lr_reinforcement, 100*epsilon_func(0), 100*epsilon_func(1), points)
-        folder = 'Phase_3_Data\\V17'
-        monkey_brain.load_state_dict(torch.load('brainsave\\Phase_2_V17_p19g100e0.brainsave'))
+        filename = 'lr{0:.2E}_e{1:.0f}_{2:.0f}_p{3:.0f}'.format(lr_reinforcement, 100*epsilon_func(0), 100*epsilon_func(1), points)
+        print('-->', filename)
+        folder = 'Phase_3_Data\\V16_leak0.01'
+        monkey_brain.load_state_dict(torch.load('brainsave\\V16_leak0.01_p19g100e0.brainsave'))
         phase_3_data = train.unguided_dqn(g, test_g, points, gamma, lr_reinforcement, \
             testing_tuple = (50, 50), epsilon_explore = epsilon_func, \
             report_score = True, number_of_tests = 500)

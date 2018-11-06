@@ -1539,7 +1539,12 @@ def guide_search(g, test_g, gamma, lr, guide, \
                     available_epsilon_explore_space = epsilon_explore_space[:2]
                 else:
                     available_epsilon_explore_space = epsilon_explore_space[epsilon_explore_index-1:epsilon_explore_index+2]
-            available_epsilon_guide_space = [x for x in epsilon_guide_space if x >= epsilon_guide_history[-1]][:2]
+            ########available_epsilon_guide_space = [x for x in epsilon_guide_space if x >= epsilon_guide_history[-1]][:2]
+            epsilon_guide_index = epsilon_guide_space.index(epsilon_guide_history[-1])
+            if epsilon_guide_index == 0:
+                available_epsilon_guide_space = epsilon_guide_space[:2]
+            else:
+                available_epsilon_guide_space = epsilon_guide_space[epsilon_guide_index-1:epsilon_guide_index+2]
         # Iterate through possibilities for epsilon_guide
         for epsilon_guide_val in available_epsilon_guide_space:
             # Generate epsilon_guide function

@@ -712,3 +712,24 @@ V17_batch130lr0.005994840990751982.brainsave
 V16_batch190lr0.002154435496777296.brainsave
 
 It's great! V17 did a much better job in Phase 2. Now onto phase 3.
+
+In phase 3 both V16 and V17 do a comparable job. The question is, will V17 continue to improve, or plateau just like V16.
+
+There was a big error in V17. V17 called V4.__init__ instead of V9.__init__, making its real architecture,
+        self.f1 = nn.Linear(485,50)
+        self.f2 = nn.Linear(50,8)
+        self.f3 = nn.Linear(8,5)
+        self.f4 = nn.Linear(40,5)
+
+I don't know what the hell that means. Anyway, I will make V18 which is what V17 was SUPPOSED TO BE.
+V18_batch220lr0.005994840990751982.brainsave
+
+It did terribly in Phase 2. I am trying phase 1 on V16 with a 0.1 and 0.01 leaky L1 clamp loss.
+V16_leak0.1_batch250lr0.005994840990751982.brainsave
+V16_leak0.01_batch370lr0.005994840990751982.brainsave
+
+The leaky L1 clamp didn't help. The neural net is still only around 75% efficiency of the guide AI. Maybe I need to run it with the guide for around a million points before trying to pull it off the guide. Yes, I should go with the guide for a long time to see if the neural net is capable of coming closer to replicating it. One way to know for sure is to try phase 2 letting epsilon_guide increase or decrease.
+
+Trying it with 100 000 guide points.
+
+What I have seen interestingly is that epsilon_explore probably wants to increase further than it has. Also, epsilon guide goes from 0 to 1 at 600000 back to 0.1 at 9000 and ends at 0.2. Hard to understand it. Anyway, I think the most important thing to do is improve phase 1. One idea I had is to have a neural net with with one hidden layer to replicate the AI as per the normal method (outputs a one hot), then transfer the input and hidden layer into a neural net that outputs a quality. I could also try to change the slopes on L1 clamp loss. It's much worse for the winning direction to be too small than too large, so it really shouldn't be evenly sloped.
